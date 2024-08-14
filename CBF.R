@@ -3,8 +3,12 @@
 # 14 August 2024
 
 # Libraries
-library(dpylr) # Pipe and data manipulation
+library(dplyr) # Pipe and data manipulation
 library(imager) # Load video
+library(StereoMorph) # extract video frames
 
 # Load data
-video <- load.video("21_073_1.MOV")
+video <- load.video("21_073_1.MOV", maxSize = 1)
+
+# Extract the last 500 frames
+extractFrames(file = '21_073_1.MOV', save.to = 'Frames', frames = 9582:9584)
