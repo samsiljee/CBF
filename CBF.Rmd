@@ -2,12 +2,26 @@
 # Sam Siljee
 # 14 August 2024
 
-# Libraries
+---
+title: "CBF analysis"
+author: "Sam Siljee"
+date: '2022-06-17'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, include = FALSE}
 library(dplyr) # Pipe and data manipulation
 library(StereoMorph) # extract video frames
+library(ggplot2) # plotting
 library(imager) # load images
-library(signal)
+library(signal) # Windowing for FFT
+```
 
+```{r Set some constants}
 # Vector for donor IDs
 donor_IDs <- c(
   "21_073",
@@ -16,6 +30,14 @@ donor_IDs <- c(
   "21_189"
 )
 
+# Set video details
+height <- 640
+width <- 360
+frame_rate <- 480
+num_frames <- 500
+```
+
+```{r Extract frames}
 # Extract frame from the videos
 # Loop through donors
 for (donor in donor_IDs) {
@@ -32,18 +54,37 @@ for (donor in donor_IDs) {
     )
   }
 }
+```
 
+```{r Test FFT}
+# Make a test vector
+set.seed(44)
+test_vector <- sin(frame_rate/12 * 1:num_frames) +
+  rnorm(num_frames)
+
+# Check the vector
+data.frame(x = 1:100, y = test_vector[1:100]) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_line()
+
+# Run the FFT
+FFT_res <- fft(test_vector)
+
+# Get power estimate
+xPer_test <- (1/num_frames)*abs(FFT_res^2)
+f_test <- seq(0,1.0-1/num_frames,by=1/num_frames)
+
+# Plot the power estimate
+data.frame(y=xPer_test, x=f_test) %>%
+  ggplot(aes(x=x,y=y)) + geom_line()
+```
+
+```{r FFT analysis}
 # List of images in a folder
 image_files <- list.files("Frames/21_161_5/", pattern = '*.jpg', full.names = TRUE)
 
 # Load the images
 image_list <- lapply(image_files, load.image)
-
-# Set video details
-height <- 640
-width <- 360
-frame_rate <- 480
-num_frames <- 500
 
 # Initialise an empty list to store the pixel intensity series
 pixel_series <- vector("list", height * width)
@@ -76,12 +117,11 @@ for(i in 1:length(pixel_series)) {
 }
 
 # Add in frequency domain
-FFT_freqs <- FFT_results <- vector("list", length(pixel_series))
+FFT_freqs <- vector("list", length(pixel_series))
 
 for(i in 1:length(pixel_series)) {
   FFT_freqs[[i]] <- pixel_series[[i]]
 }
-
 
 # Perform Fourier transformation and find the dominant frequency in Hz
 dominant_frequencies_hz <- sapply(pixel_series, function(series) {
@@ -102,3 +142,14 @@ frequency_matrix <- matrix(dominant_frequencies, nrow = height, ncol = width)
 # Visualize using imager's plot function
 plot(as.cimg(variance_matrix), main="Variance Map")
 plot(as.cimg(frequency_matrix), main="Dominant Frequency Map")
+```
+
+```{r Test periodogram}
+xPer_test <- (1/num_frames)*abs(fft(pixel_series[[1]])^2)
+f_test <- seq(0,1.0-1/num_frames,by=1/num_frames)
+
+# Plot the power estimate
+data.frame(y=xPer_test, x=f_test) %>%
+  ggplot(aes(x=x,y=y)) + geom_line()
+```
+
