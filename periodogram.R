@@ -1,3 +1,6 @@
+# Reference URL: https://www.r-bloggers.com/2019/06/periodogram-with-r/
+
+
 # The power spectral density (PSD) is a function that describes the distribution of power over the frequency components composing our data set. If we knew the process that generated the data, we could just calculate the PSD; we would not have to estimate it. Unfortunately, in practice we won’t have access to the random process, only the samples (data) produced by the process. So, we can’t get the true PSD, we can only get an estimate of the true PSD. In our example below, we made the data, so we know what the true PSD should look like.
 # 
 # The PSD is written as
