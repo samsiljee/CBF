@@ -34,7 +34,7 @@ for (donor in donor_IDs) {
 }
 
 # List of images in a folder
-image_files <- list.files("Frames/21_073_1/", pattern = '*.jpg', full.names = TRUE)
+image_files <- list.files("Frames/21_161_5/", pattern = '*.jpg', full.names = TRUE)
 
 # Load the images
 image_list <- lapply(image_files, load.image)
@@ -65,6 +65,23 @@ for (i in 1:height) {
 
 # Calculate variance for each pixel series
 variances <- sapply(pixel_series, var)
+
+# Add in windowing to improve FFT
+
+# Run FFT
+FFT_results <- vector("list", length(pixel_series))
+
+for(i in 1:length(pixel_series)) {
+  FFT_results[[i]] <- fft(pixel_series[[i]])
+}
+
+# Add in frequency domain
+FFT_freqs <- FFT_results <- vector("list", length(pixel_series))
+
+for(i in 1:length(pixel_series)) {
+  FFT_freqs[[i]] <- pixel_series[[i]]
+}
+
 
 # Perform Fourier transformation and find the dominant frequency in Hz
 dominant_frequencies_hz <- sapply(pixel_series, function(series) {
