@@ -46,10 +46,10 @@ for (donor in donor_IDs) {
     # Extract the last 500 frames
     extractFrames(
       file = paste0("HS_video_copies/", donor, "_", i, ".MOV"),
-      save.to = paste0("Frames/", donor, "_", i),
+      save.to = paste0("Frames_bmp/", donor, "_", i),
       frames = 9085:9584,
       names = paste0(donor, "_", i, "_", sprintf("%03.0f", 1:500)),
-      ext = "jpg",
+      ext = "bmp",
       warn.min = 501
     )
   }
