@@ -2,6 +2,9 @@
 Frames/*
 Frames_bmp/*
 
+# byte volume data
+*.raw
+
 # Video files
 *.MOV
 
