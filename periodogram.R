@@ -13,6 +13,9 @@
 # 
 # The periodogram is very easy to implement in R, but before we do we need to simulate some data. The code below first uses the set.seed command so R will produce the same “random” numbers each time. Then it creates a 32 normally distributed numbers and 32 points of a sine wave with a normalized frequency of 0.4 and a amplitude of 2. The signal is made up of a sine wave and the random points added together.
 
+library(dplyr)
+library(ggplot2)
+
 set.seed(0)
 N <-32
 n<- 0:(N-1)
