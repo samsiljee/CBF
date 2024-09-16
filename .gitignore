@@ -2,6 +2,9 @@
 Frames/*
 Frames_bmp/*
 
+# Produced images
+*.png
+
 # byte volume data
 *.raw
 
