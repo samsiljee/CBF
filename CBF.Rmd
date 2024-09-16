@@ -19,6 +19,7 @@ library(StereoMorph) # extract video frames
 library(ggplot2) # plotting
 library(imager) # load images
 library(signal) # Windowing for FFT
+library(magick) # Read in video files, with `ffmpeg`
 ```
 
 ```{r Set some constants}
@@ -31,11 +32,14 @@ donor_IDs <- c(
 )
 
 # Set video details
-height <- 640
-width <- 360
+height <- 360
+width <- 640
 frame_rate <- 480
 num_frames <- 500
 ```
+
+## Extract frames 
+Extract frames and save as bmp files.
 
 ```{r Extract frames}
 # Extract frame from the videos
@@ -55,6 +59,78 @@ for (donor in donor_IDs) {
   }
 }
 ```
+
+## Extract raw volume
+Extract last 500 frames and save as raw volume
+```{r Extract raw volume}
+# Load video with magick
+video_frames <- image_read_video("21_073_1.MOV", fps = frame_rate)
+
+# keep the last X frames
+video_frames <- video_frames[(length(video_frames)-(num_frames - 1)):length(video_frames)]
+
+# Initialize an empty list to store grayscale frames
+frames_list <- vector("list", num_frames)
+
+# Extract pixel values and convert to greyscale
+for (i in 1:num_frames) {
+  # Extract the current frame
+  frame <- video_frames[i]
+  
+  # Convert the frame to grayscale
+  frame_gray <- image_convert(frame, colorspace = "gray")
+  
+  # Get pixel values and scale to 0-255 range
+  frame_matrix <- as.integer(image_data(frame_gray))
+  
+  # Store the frame matrix in the list
+  frames_list[[i]] <- frame_matrix
+}
+
+# Stack the frames into a 3D array (height x width x frames)
+byte_volume <- array(unlist(frames_list), dim = c(height, width, num_frames))
+
+# Convert to unsigned 8-bit integer
+byte_volume <- as.raw(byte_volume)
+
+# Write byte volume
+writeBin(byte_volume, "output_volume.raw")
+```
+
+## Signal power image
+```{r Signal power image}
+# A kind of signal power image:
+# - Subtract each frame from the previous frame. (If you do this in R, be careful with signed/unsigned issues. If you have plenty of memory, convert all images to signed integer or to floating point).
+# - Take the absolute value of those difference frames.
+# - Add all the difference frames, resulting in a 360x640 image.
+
+# Initialise blank matrix for signal power image
+signal_power_image <- matrix(data = NA, ncol = width, nrow = height)
+
+# Loop through pixels to get differences
+for(i in 1:height){ # loop through rows
+  for(j in 1:width){ # Loop through columns
+    
+    # Initialise sum difference values
+    sum_dif_vals <- numeric(0)
+    
+    for(k in 2:num_frames){ # loop through frames, skipping the first
+      # Take absolute difference of one pixel value from the previous one
+      difference <- abs(frames_list[[k]][i,j] - frames_list[[k-1]][i,j])
+      
+      # Add to other difference values of the frame
+      sum_dif_vals <- sum_dif_vals + difference
+    }
+    
+    # Add sum difference values to signal power image
+    signal_power_image[i,j] <- sum_dif_vals
+    
+  }
+}
+
+```
+
+## FFT
 
 ```{r Test FFT}
 # Make a test vector
