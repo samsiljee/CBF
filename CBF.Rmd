@@ -64,7 +64,7 @@ for (donor in donor_IDs) {
 Extract last 500 frames and save as raw volume
 ```{r Extract raw volume}
 # Load video with magick
-video_frames <- image_read_video("21_073_1.MOV", fps = frame_rate)
+video_frames <- image_read_video("21_073_1.MOV", fps = NULL)
 
 # keep the last X frames
 video_frames <- video_frames[(length(video_frames)-(num_frames - 1)):length(video_frames)]
@@ -112,11 +112,11 @@ for(i in 1:height){ # loop through rows
   for(j in 1:width){ # Loop through columns
     
     # Initialise sum difference values
-    sum_dif_vals <- numeric(0)
+    sum_dif_vals <- 0
     
     for(k in 2:num_frames){ # loop through frames, skipping the first
       # Take absolute difference of one pixel value from the previous one
-      difference <- abs(frames_list[[k]][i,j] - frames_list[[k-1]][i,j])
+      difference <- abs(frames_list[[k]][i,j,1] - frames_list[[(k-1)]][i,j,1])
       
       # Add to other difference values of the frame
       sum_dif_vals <- sum_dif_vals + difference
@@ -124,9 +124,19 @@ for(i in 1:height){ # loop through rows
     
     # Add sum difference values to signal power image
     signal_power_image[i,j] <- sum_dif_vals
-    
   }
+  print(paste0(round(i/height*100), "%"))
 }
+
+# Save as a PNG image
+png("signal_power_image.png", width = width, height = height)
+
+# Remove margins around the image
+par(mar = c(0, 0, 0, 0))
+
+image(signal_power_image, col = gray.colors(256), axes = FALSE, zlim = range(signal_power_image))
+
+dev.off()
 
 ```
 
