@@ -185,7 +185,7 @@ for(d in donor_IDs) { # Loop through donors
   for (x in 1:height) { # loop through rows
     for (y in 1:width) { # Loop through columns
       # Initialise vector of pixel values
-      pixel_values <- 0
+      pixel_values <- numeric()
       
       for(f in 1:num_frames) { # Loop through frames
         pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
@@ -196,6 +196,10 @@ for(d in donor_IDs) { # Loop through donors
     }
   }
 }
+
+
+# Save the data as a .rda file
+save(variance_list, file = paste0(output_dir, "variance_list.rda"))
 
 # Create variance images
 for(d in donor_IDs) {
@@ -233,72 +237,93 @@ for(d in donor_IDs) {
 }
 ```
 
+## FFT dominant frequency
+```{r FFT frequencies}
+# Initialise list to contain variances
+FFT_freq_list <- vector("list", length(donor_IDs))
+names(FFT_freq_list) <- donor_IDs
+for(d in donor_IDs) {
+  FFT_freq_list[[d]] <- matrix(ncol = width, nrow = height)
+}
 
-```{r FFT analysis}
-
-
-# Initialise an empty list to store the pixel intensity series
-pixel_series <- vector("list", height * width)
-
-# Loop through each pixel position
-for (i in 1:height) {
-  for (j in 1:width) {
-    # Extract the intensity values for pixel (i, j) in the red channel across all frames
-    series <- sapply(image_list, function(img) {
-      img[i, j, 1, 1] # Accessing the first channel (red channel)
-    })
-
-    # Store the series in the list
-    pixel_series[[(i - 1) * width + j]] <- series
+for(d in donor_IDs) { # Loop through donors
+  # Progress monitor
+  print(
+    paste0(
+      "Calculating pixel variances for donor ",
+      d,
+      ", ",
+      which(donor_IDs %in% d),
+      " of ",
+      length(donor_IDs)
+    )
+  )
+  
+  for (x in 1:height) { # loop through rows
+    for (y in 1:width) { # Loop through columns
+      # Initialise vector of pixel values
+      pixel_values <- numeric()
+      
+      for(f in 1:num_frames) { # Loop through frames
+        pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
+      }
+      
+      # Calculate the dominant frequency from pixel values
+      # Run FFT
+      fft_result <- fft(pixel_values)
+      
+      # Find maximum magnitude - using half the dataset (symetrical)
+      magnitude <- abs(fft_result[1:(num_frames/2 + 1)])
+      
+      # Create frequency vector
+      freq <- seq(0, frame_rate/2, length.out = num_frames/2 + 1)
+      
+      # Find the frequency with maximum amplitude
+      # Excluding the DC component (first element)
+      max_index <- which.max(magnitude[2:length(magnitude)]) + 1
+      
+      # Add to list in the required position
+      FFT_freq_list[[d]][x, y] <- freq[max_index]
+    }
   }
 }
 
-# Calculate variance for each pixel series
-variances <- sapply(pixel_series, var)
 
-# Add in windowing to improve FFT
+# Save the data as a .rda file
+save(FFT_freq_list, file = paste0(output_dir, "FFT_freq_list.rda"))
 
-# Run FFT
-FFT_results <- vector("list", length(pixel_series))
+# Create variance images
+for(d in donor_IDs) {
+   # Progress monitor
+  print(
+    paste0(
+      "Creating pixel FFT frequency image for donor ",
+      d,
+      ", ",
+      which(donor_IDs %in% d),
+      " of ",
+      length(donor_IDs)
+    )
+  )
+  
+  # Save as a PNG image - grayscale
+  png(paste0(output_dir, "FFT_freq_image_", d, "_grayscale.png"), width = width, height = height)
+  
+  # Remove margins around the image
+  par(mar = c(0, 0, 0, 0))
+  
+  image(FFT_freq_list[[d]], col = gray.colors(256), axes = FALSE, zlim = range(FFT_freq_list[[d]]))
+  
+  dev.off()
 
-for (i in 1:length(pixel_series)) {
-  FFT_results[[i]] <- fft(pixel_series[[i]])
+   # Save as a PNG image - rainbow
+  png(paste0(output_dir, "FFT_freq_image_", d, "_rainbow.png"), width = width, height = height)
+  
+  # Remove margins around the image
+  par(mar = c(0, 0, 0, 0))
+  
+  image(FFT_freq_list[[d]], col = rainbow(256), axes = FALSE, zlim = range(FFT_freq_list[[d]]))
+  
+  dev.off()
 }
-
-# Add in frequency domain
-FFT_freqs <- vector("list", length(pixel_series))
-
-for (i in 1:length(pixel_series)) {
-  FFT_freqs[[i]] <- pixel_series[[i]]
-}
-
-# Perform Fourier transformation and find the dominant frequency in Hz
-dominant_frequencies_hz <- sapply(pixel_series, function(series) {
-  fft_res <- fft(series)
-  # Calculate the magnitude of the FFT
-  mag <- Mod(fft_res)
-  # Find the index of the dominant frequency (ignoring the zero-frequency component)
-  dominant_index <- which.max(mag[-1]) + 1
-  # Calculate the dominant frequency in Hz
-  freq_hz <- (dominant_index - 1) * frame_rate / num_frames
-  return(freq_hz)
-})
-
-# Reshape the variances and frequencies into matrices
-variance_matrix <- matrix(variances, nrow = height, ncol = width)
-frequency_matrix <- matrix(dominant_frequencies, nrow = height, ncol = width)
-
-# Visualize using imager's plot function
-plot(as.cimg(variance_matrix), main = "Variance Map")
-plot(as.cimg(frequency_matrix), main = "Dominant Frequency Map")
-```
-
-```{r Test periodogram}
-xPer_test <- (1 / num_frames) * abs(fft(pixel_series[[1]])^2)
-f_test <- seq(0, 1.0 - 1 / num_frames, by = 1 / num_frames)
-
-# Plot the power estimate
-data.frame(y = xPer_test, x = f_test) %>%
-  ggplot(aes(x = x, y = y)) +
-  geom_line()
 ```
