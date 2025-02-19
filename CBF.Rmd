@@ -162,14 +162,25 @@ for (d in donor_IDs) {
 
 ## Variances
 ```{r Variances}
+# Initialise list to contain variances
+variance_list <- vector("list", length(donor_IDs))
+names(variance_list) <- donor_IDs
+for(d in donor_IDs) {
+  variance_list[[d]] <- matrix(ncol = width, nrow = height)
+}
+
 for(d in donor_IDs) { # Loop through donors
-  for(f in 1:num_frames) { # Loop through frames
-    for (x in 1:height) { # loop through rows
-      for (y in 1:width) { # Loop through columns
-        # Initialise vector of pixel values
-        pixel_values <- 0
-        
+  for (x in 1:height) { # loop through rows
+    for (y in 1:width) { # Loop through columns
+      # Initialise vector of pixel values
+      pixel_values <- 0
+      
+      for(f in 1:num_frames) { # Loop through frames
+        pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
       }
+      
+      # Calculate variances and add to list in the required position
+      variance_list[[d]][x, y] <- var(pixel_values)
     }
   }
 }
