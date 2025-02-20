@@ -250,7 +250,7 @@ for(d in donor_IDs) { # Loop through donors
   # Progress monitor
   print(
     paste0(
-      "Calculating pixel variances for donor ",
+      "Calculating FFT maximum frequency for donor ",
       d,
       ", ",
       which(donor_IDs %in% d),
