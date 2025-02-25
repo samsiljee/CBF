@@ -286,13 +286,12 @@ for(d in donor_IDs) { # Loop through donors
       FFT_freq_list[[d]][x, y] <- freq[max_index]
     }
   }
-}
-
+} 
 
 # Save the data as a .rda file
 save(FFT_freq_list, file = paste0(output_dir, "FFT_freq_list.rda"))
 
-# Create variance images
+# Create dominant frequency images
 for(d in donor_IDs) {
    # Progress monitor
   print(
