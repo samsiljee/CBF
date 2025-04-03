@@ -85,7 +85,7 @@ for (d in donor_IDs) {
 
   # Save the frame list under the relevant donor
   data_list[[d]] <- frames_list
-  
+
   # Clear the cache to free space
   gc()
 }
@@ -114,7 +114,7 @@ for (d in donor_IDs) {
       length(donor_IDs)
     )
   )
-  
+
   # Initialise blank matrix for signal power image
   signal_power_image <- matrix(data = NA, ncol = width, nrow = height)
 
@@ -165,11 +165,11 @@ for (d in donor_IDs) {
 # Initialise list to contain variances
 variance_list <- vector("list", length(donor_IDs))
 names(variance_list) <- donor_IDs
-for(d in donor_IDs) {
+for (d in donor_IDs) {
   variance_list[[d]] <- matrix(ncol = width, nrow = height)
 }
 
-for(d in donor_IDs) { # Loop through donors
+for (d in donor_IDs) { # Loop through donors
   # Progress monitor
   print(
     paste0(
@@ -181,16 +181,16 @@ for(d in donor_IDs) { # Loop through donors
       length(donor_IDs)
     )
   )
-  
+
   for (x in 1:height) { # loop through rows
     for (y in 1:width) { # Loop through columns
       # Initialise vector of pixel values
       pixel_values <- numeric()
-      
-      for(f in 1:num_frames) { # Loop through frames
+
+      for (f in 1:num_frames) { # Loop through frames
         pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
       }
-      
+
       # Calculate variances and add to list in the required position
       variance_list[[d]][x, y] <- var(pixel_values)
     }
@@ -202,8 +202,8 @@ for(d in donor_IDs) { # Loop through donors
 save(variance_list, file = paste0(output_dir, "variance_list.rda"))
 
 # Create variance images
-for(d in donor_IDs) {
-   # Progress monitor
+for (d in donor_IDs) {
+  # Progress monitor
   print(
     paste0(
       "Creating pixel variance images for donor ",
@@ -214,25 +214,25 @@ for(d in donor_IDs) {
       length(donor_IDs)
     )
   )
-  
+
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "variance_image_", d, "_grayscale.png"), width = width, height = height)
-  
+
   # Remove margins around the image
   par(mar = c(0, 0, 0, 0))
-  
+
   image(variance_list[[d]], col = gray.colors(256), axes = FALSE, zlim = range(variance_list[[d]]))
-  
+
   dev.off()
 
-   # Save as a PNG image - rainbow
+  # Save as a PNG image - rainbow
   png(paste0(output_dir, "variance_image_", d, "_rainbow.png"), width = width, height = height)
-  
+
   # Remove margins around the image
   par(mar = c(0, 0, 0, 0))
-  
+
   image(variance_list[[d]], col = rainbow(256), axes = FALSE, zlim = range(variance_list[[d]]))
-  
+
   dev.off()
 }
 ```
@@ -240,16 +240,16 @@ for(d in donor_IDs) {
 ## FFT dominant frequency
 ```{r FFT frequencies}
 # Create frequency vector
-freq <- seq(0, frame_rate/2, length.out = num_frames/2 + 1)
+freq <- seq(0, frame_rate / 2, length.out = num_frames / 2 + 1)
 
 # Initialise list to contain dominant frequencies
 FFT_freq_list <- vector("list", length(donor_IDs))
 names(FFT_freq_list) <- donor_IDs
-for(d in donor_IDs) {
+for (d in donor_IDs) {
   FFT_freq_list[[d]] <- matrix(ncol = width, nrow = height)
 }
 
-for(d in donor_IDs) { # Loop through donors
+for (d in donor_IDs) { # Loop through donors
   # Progress monitor
   print(
     paste0(
@@ -261,39 +261,39 @@ for(d in donor_IDs) { # Loop through donors
       length(donor_IDs)
     )
   )
-  
+
   for (x in 1:height) { # loop through rows
     for (y in 1:width) { # Loop through columns
       # Initialise vector of pixel values
       pixel_values <- numeric()
-      
-      for(f in 1:num_frames) { # Loop through frames
+
+      for (f in 1:num_frames) { # Loop through frames
         pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
       }
-      
+
       # Calculate the dominant frequency from pixel values
       # Run FFT
       fft_result <- fft(pixel_values)
-      
+
       # Find maximum magnitude - using half the dataset (symetrical)
-      magnitude <- abs(fft_result[1:(num_frames/2 + 1)])
-      
+      magnitude <- abs(fft_result[1:(num_frames / 2 + 1)])
+
       # Find the frequency with maximum amplitude
       # Excluding the DC component (first element)
       max_index <- which.max(magnitude[-1]) + 1
-      
+
       # Add to list in the required position - converted to real frequency
       FFT_freq_list[[d]][x, y] <- freq[max_index]
     }
   }
-} 
+}
 
 # Save the data as a .rda file
 save(FFT_freq_list, file = paste0(output_dir, "FFT_freq_list.rda"))
 
 # Create dominant frequency images
-for(d in donor_IDs) {
-   # Progress monitor
+for (d in donor_IDs) {
+  # Progress monitor
   print(
     paste0(
       "Creating pixel FFT frequency image for donor ",
@@ -304,25 +304,25 @@ for(d in donor_IDs) {
       length(donor_IDs)
     )
   )
-  
+
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "FFT_freq_image_", d, "_grayscale.png"), width = width, height = height)
-  
+
   # Remove margins around the image
   par(mar = c(0, 0, 0, 0))
-  
+
   image(FFT_freq_list[[d]], col = gray.colors(256), axes = FALSE, zlim = range(FFT_freq_list[[d]]))
-  
+
   dev.off()
 
-   # Save as a PNG image - rainbow
+  # Save as a PNG image - rainbow
   png(paste0(output_dir, "FFT_freq_image_", d, "_rainbow.png"), width = width, height = height)
-  
+
   # Remove margins around the image
   par(mar = c(0, 0, 0, 0))
-  
+
   image(FFT_freq_list[[d]], col = rainbow(256), axes = FALSE, zlim = range(FFT_freq_list[[d]]))
-  
+
   dev.off()
 }
 ```
@@ -332,11 +332,11 @@ for(d in donor_IDs) {
 # Initialise list to contain dominant frequencies (unconverted)
 FFT_freq_list_unconverted <- vector("list", length(donor_IDs))
 names(FFT_freq_list) <- donor_IDs
-for(d in donor_IDs) {
+for (d in donor_IDs) {
   FFT_freq_list_unconverted[[d]] <- matrix(ncol = width, nrow = height)
 }
 
-for(d in donor_IDs) { # Loop through donors
+for (d in donor_IDs) { # Loop through donors
   # Progress monitor
   print(
     paste0(
@@ -348,39 +348,39 @@ for(d in donor_IDs) { # Loop through donors
       length(donor_IDs)
     )
   )
-  
+
   for (x in 1:height) { # loop through rows
     for (y in 1:width) { # Loop through columns
       # Initialise vector of pixel values
       pixel_values <- numeric()
-      
-      for(f in 1:num_frames) { # Loop through frames
+
+      for (f in 1:num_frames) { # Loop through frames
         pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
       }
-      
+
       # Calculate the dominant frequency from pixel values
       # Run FFT
       fft_result <- fft(pixel_values)
-      
+
       # Find maximum magnitude - using half the dataset (symetrical)
-      magnitude <- abs(fft_result[1:(num_frames/2 + 1)])
-      
+      magnitude <- abs(fft_result[1:(num_frames / 2 + 1)])
+
       # Find the frequency with maximum amplitude
       # Excluding the DC component (first element)
       max_index <- which.max(magnitude[-1]) + 1
-      
+
       # Add to list in the required position - unconverted to real frequency
       FFT_freq_list_unconverted[[d]][x, y] <- max_index
     }
   }
-} 
+}
 
 # Save the data as a .rda file
 save(FFT_freq_list_unconverted, file = paste0(output_dir, "FFT_freq_list_unconverted.rda"))
 
 # Create dominant frequency images
-for(d in donor_IDs) {
-   # Progress monitor
+for (d in donor_IDs) {
+  # Progress monitor
   print(
     paste0(
       "Creating pixel FFT unconverted frequency image for donor ",
@@ -391,25 +391,57 @@ for(d in donor_IDs) {
       length(donor_IDs)
     )
   )
-  
+
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width, height = height)
-  
+
   # Remove margins around the image
   par(mar = c(0, 0, 0, 0))
-  
+
   image(FFT_freq_list_unconverted[[d]], col = gray.colors(256), axes = FALSE, zlim = range(FFT_freq_list_unconverted[[d]]))
-  
+
   dev.off()
 
-   # Save as a PNG image - rainbow
+  # Save as a PNG image - rainbow
   png(paste0(output_dir, "FFT_unconverted_freq_image_", d, "_rainbow.png"), width = width, height = height)
-  
+
   # Remove margins around the image
   par(mar = c(0, 0, 0, 0))
-  
+
   image(FFT_freq_list_unconverted[[d]], col = rainbow(256), axes = FALSE, zlim = range(FFT_freq_list_unconverted[[d]]))
-  
+
   dev.off()
+}
+```
+
+## Histograms of indexes
+```{r histograms}
+# Create dominant index histograms
+for (d in donor_IDs) {
+  # Progress monitor
+  print(
+    paste0(
+      "Creating dominant frequency histogram for donor ",
+      d,
+      ", ",
+      which(donor_IDs %in% d),
+      " of ",
+      length(donor_IDs)
+    )
+  )
+
+  indexes <- FFT_freq_list_unconverted[[d]] %>% as.numeric()
+
+  ggplot(data.frame(Index = indexes), aes(x = Index)) +
+    geom_histogram(binwidth = 1) +
+    labs(
+      x = "Dominant frequency index (binwidth = 1)",
+      y = "Count",
+      title = paste("Hisotgram of dominant frequency indexes:", d)
+    ) +
+    theme_bw()
+
+  # Save the plot
+  ggsave(paste0(output_dir, d, " frequency index histogram.png"), width = 8, height = 5.5)
 }
 ```
