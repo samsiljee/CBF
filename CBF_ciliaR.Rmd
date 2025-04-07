@@ -1,0 +1,158 @@
+---
+title: "CBF_ciliaR"
+author: "Sam Siljee"
+date: "2025-04-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+Script to analyse cilia beat frequency using the ciliaR package from Oriane Grant et. al. (Dr Claire Smith lab), paper available:
+https://doi.org/10.1101/2023.12.20.572306
+```{r libraries}
+library(dplyr) # Data manipulation
+library(stringr) # Get list of donors from input directory
+library(ggplot2) # Plotting
+library(magick) # Read in video files, with `ffmpeg`
+source("analyse_cilia2 (PC).R") # Get the analyse_cilia2 function
+```
+
+```{r Set some variables}
+# Directories
+input_dir <- "Input/"
+output_dir <- "Output/"
+
+# Read in data fresh
+read_from_rda <- TRUE
+
+# Set video details
+height <- 360
+width <- 640
+frame_rate <- 480
+num_frames <- 500
+
+# Vector for donor IDs - read from available .MOV files in input
+donor_IDs <- list.files(input_dir) %>%
+  grep(pattern = ".MOV$", value = TRUE) %>%
+  str_remove(".MOV")
+```
+
+## Load the data
+Read in from .mov files into a list of data
+```{r Extract frames}
+if (read_from_rda) {
+  load(paste0(output_dir, "data_list.rda"))
+} else {
+  # Initialise a list to hold all pixel data
+  data_list <- list()
+
+  # Iterate over donors - extract relevant pixel values
+  for (d in donor_IDs) {
+    # Print message to keep track of progress
+    print(
+      paste0(
+        "Extracting frames for donor ",
+        d,
+        ", ",
+        which(donor_IDs %in% d),
+        " of ",
+        length(donor_IDs)
+      )
+    )
+
+    # Load video with magick
+    video_frames <- image_read_video(paste0(input_dir, d, ".MOV"), fps = NULL)
+
+    # keep the last X frames
+    video_frames <- video_frames[(length(video_frames) - (num_frames - 1)):length(video_frames)]
+
+    # Initialize an empty list to store grayscale frames
+    frames_list <- vector("list", num_frames)
+
+    # Extract pixel values and convert to greyscale
+    for (f in 1:num_frames) {
+      # Extract the current frame
+      frame <- video_frames[f]
+
+      # Convert the frame to grayscale
+      frame_gray <- image_convert(frame, colorspace = "gray")
+
+      # Get pixel values and scale to 0-255 range
+      frame_matrix <- as.integer(image_data(frame_gray))
+
+      # Store the frame as a matrix in the list
+      frames_list[[f]] <- matrix(frame_matrix, ncol = width)
+    }
+
+    # Save the frame list under the relevant donor
+    data_list[[d]] <- frames_list
+
+    # Clear the cache to free space
+    gc()
+  }
+
+  # Save the data as a .rda file
+  save(data_list, file = paste0(output_dir, "data_list.rda"))
+}
+```
+
+## Format data
+Format for `analyse_cilia2` function. The format takes the form of a column for every ROI. In the paper this takes the form of dividing intoa  set number of rows and columns, to a minimum of 1,600 ROIs. I use every pixel as its own ROI. every row represents the mean intensity of the ROIs, one row for every frame. The number of frames used must be a power of 2 (eg. 256, 512). This is then saved as a .txt file The first column is a set of row index numbers, the second column called "Label" is the file name, subsequent columns are labelled 
+```{r Format the data for ciliaR}
+for(d in donor_IDs) {
+  # Progress monitor
+  print(
+    paste0(
+      "Formatting data for donor ",
+      d,
+      ", ",
+      which(donor_IDs %in% d),
+      " of ",
+      length(donor_IDs)
+    )
+  )
+  
+  # Subset the data by donor
+  data <- data_list[[d]]
+  
+  # Initialise the data.frame to fill
+  formatted_data <- matrix(NA, nrow = num_frames, ncol = height*width)
+  
+  # Add in the data
+  for (f in 1:num_frames) {
+    formatted_data[f,] <- as.numeric(data[[f]])
+  }
+  
+  # Change to data.frame format to change column names and add Label column
+  formatted_data <- as.data.frame(formatted_data)
+  Label <- rep(d, num_frames)
+  formatted_data <- cbind(Label, formatted_data)
+  colnames(formatted_data) <- c("Label", paste0("Mean", 1:(height*width)))
+  
+  # Save as .txt file
+  write.table(
+    formatted_data,
+    file = paste0(input_dir, "Formatted_for_ciliaR/", d, ".txt"),
+    quote = FALSE,
+    row.names=TRUE,
+    sep="\t"
+  )
+}
+```
+
+## Run ciliaR
+Run the ciliaR analysis - default noise and upper limit thresholds
+```{r}
+list.files(paste0(input_dir, "Formatted_for_ciliaR"))
+
+analyse_cilia2(
+  path = paste0(input_dir, "Formatted_for_ciliaR"),
+  FRate = frame_rate,
+  NFrame = num_frames,
+  NoiseLevel = 3,
+  UpperLimit = 30
+)
+```
