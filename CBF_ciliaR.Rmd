@@ -32,7 +32,7 @@ read_from_rda <- TRUE
 height <- 360
 width <- 640
 frame_rate <- 480
-num_frames <- 500
+num_frames <- 2^9 # Use powers of 2 for analysis
 
 # Vector for donor IDs - read from available .MOV files in input
 donor_IDs <- list.files(input_dir) %>%
@@ -145,14 +145,105 @@ for(d in donor_IDs) {
 
 ## Run ciliaR
 Run the ciliaR analysis - default noise and upper limit thresholds
-```{r}
-list.files(paste0(input_dir, "Formatted_for_ciliaR"))
+```{r ciliaR}
+# # Run using the code suggested, currently not functioning
+# list.files(paste0(input_dir, "Formatted_for_ciliaR"))
+# 
+# analyse_cilia2(
+#   path = paste0(input_dir, "Formatted_for_ciliaR"),
+#   FRate = frame_rate,
+#   NFrame = num_frames,
+#   NoiseLevel = 3,
+#   UpperLimit = 30
+# )
 
-analyse_cilia2(
-  path = paste0(input_dir, "Formatted_for_ciliaR"),
-  FRate = frame_rate,
-  NFrame = num_frames,
-  NoiseLevel = 3,
-  UpperLimit = 30
-)
+# Run using the code taken from the ciliaR function code
+# Set the variables
+FRate <- frame_rate
+NFrame <- num_frames
+NoiseLevel <- 3
+UpperLimit <- 30
+
+# Code chunk  - ciliR analysis part 1
+dataset <- data.frame()
+datalist = list()
+
+FreqRes <- FRate / NFrame
+BackGr <- round(NoiseLevel/FreqRes, digits = 0)
+BackGr1 <- BackGr + 1
+EndFrame <- round(UpperLimit/FreqRes, digits = 0)
+
+# Start loop through donors
+for(d in "21_073_1") {
+  # Progress monitor
+  print(
+    paste0(
+      "Running ciliaR for donor ",
+      d,
+      ", ",
+      which(donor_IDs %in% d),
+      " of ",
+      length(donor_IDs)
+    )
+  )
+  
+  # Load the data
+  my_data <- utils::read.delim(paste0(input_dir, "Formatted_for_ciliaR/", d, ".txt"),  header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+  
+  # # Trim number of ROIs for faster processing
+  # my_data <- my_data[,1:1600]
+  
+  #fourier transform
+  my_data2 <- head(my_data, NFrame)
+  my_data3 <- my_data2[, -c(1:2), -c(100001)] # delete first columns which are not of interest
+  fourierd <- apply(my_data3,2,function(x) fft(as.numeric(x)))
+  fourierdat <- as.data.frame(fourierd)
+  
+  #get absolute values
+  AbsAll <- abs(fourierdat)
+  
+  #noise reduction: compare the amplitude peak of the data to the amplitude peak of the background noise
+  AbsNoise <- AbsAll[2:BackGr,]    # divide the data into subsets of background noise (<3Hz)
+  AbsReal <- AbsAll[BackGr1:EndFrame,]
+  max.power.F1<- apply(AbsNoise, 2, max) # find the maximum value of each subset
+  max.power.F2<- apply(AbsReal, 2, max) # find the maximum value of each subset
+  
+  #if F2 >F1 find row number of F2
+  BF <- sapply(AbsReal[-1, ], which.max) ## find the row number containing the max. value of each column
+  BF2 <- as.numeric(BF)
+  BFData <- ifelse(max.power.F2 > (max.power.F1 * NoiseLevel),  BF2 , 0)
+  
+  #convert to Hz
+  sapply(BFData, class)
+  BFdata2 <- as.numeric(BFData) * FreqRes # times row number by frequency resolution
+  Hz <- BFdata2 + FreqRes # add value of missing row
+  
+  #only include data in clinical range
+  BFData4 <- ifelse(Hz>3 & Hz<UpperLimit, Hz, 0)   ##
+  dat <- data.frame(BFData4)
+  names(dat)[1] <- d
+  datalist[[d]] <- dat
+}
+
+#present big results table
+bigdata <- suppressMessages(dplyr::bind_cols(datalist))
+bigdata[bigdata==0] <- NA
+
+# Save results as .csv
+write.csv(bigdata, file = paste0(output_dir, "summary.csv"), row.names = FALSE)
+print(summary(bigdata))
+assign("ciliaR_results", bigdata, envir = .GlobalEnv)
+
+# Save as .rda file
+save(ciliaR_results, file = paste0(input_dir, "ciliaR_results.rda"))
 ```
+
+## Write to .csv for processing in ImageJ
+```{r Write to .csv}
+for(d in donor_IDs) {
+  write.csv(
+    matrix(ciliaR_results[[d]], nrow = height, ncol = width),
+    paste0(output_dir, "csv_results/", d, "_fft_dominant_frequencies.csv"))
+}
+```
+
