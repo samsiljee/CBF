@@ -3,7 +3,7 @@
 # 19 February 2025
 
 ---
-  title: "CBF analysis"
+title: "CBF analysis"
 author: "Sam Siljee"
 date: '2022-06-17'
 output: html_document
@@ -66,7 +66,7 @@ for (d in donor_IDs) {
   video_frames <- video_frames[(length(video_frames) - (num_frames - 1)):length(video_frames)]
 
   # Initialize an empty list to store grayscale frames
-  frames_array <- array(NA, dim = c(width, height, num_frames))
+  frames_array <- array(NA, dim = c(height, width, num_frames))
 
   # Extract pixel values and convert to greyscale
   for (f in 1:num_frames) {
@@ -194,18 +194,22 @@ for (d in donor_IDs) {
       length(donor_IDs)
     )
   )
+  
+    # Scale manually to 0-255
+  variance_max <- max(variance_list[[d]])
+  variance_image <- round(variance_list[[d]] / variance_max * 255)
 
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "variance_images/variance_image_", d, "_grayscale.png"), width = width, height = height)
 
-  image(variance_list[[d]], col = gray.colors(256), axes = FALSE, zlim = range(variance_list[[d]]))
+  image(variance_image, col = gray.colors(256), axes = FALSE)
 
   dev.off()
 
   # Save as a PNG image - rainbow
   png(paste0(output_dir, "variance_images/variance_image_", d, "_rainbow.png"), width = width, height = height)
 
-  image(variance_list[[d]], col = rainbow(256), axes = FALSE, zlim = range(variance_list[[d]]))
+  image(variance_image, col = rainbow(256), axes = FALSE)
 
   dev.off()
 }
@@ -284,32 +288,39 @@ for (d in donor_IDs) {
       length(donor_IDs)
     )
   )
+  
+  # Scale manually to 0-255
+  fft_max <- max(FFT_freq_list[[d]])
+  fft_image <- round(FFT_freq_list[[d]] / fft_max * 255)
+  
+  fft_unconverted_max <- max(FFT_freq_list_unconverted[[d]])
+  fft_unconverted_image <- round(FFT_freq_list_unconverted[[d]] / fft_unconverted_max * 255)
 
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_grayscale.png"), width = width, height = height)
 
-  image(FFT_freq_list[[d]], col = gray.colors(256), axes = FALSE, zlim = range(FFT_freq_list[[d]]))
+  image(fft_image, col = gray.colors(256), axes = FALSE)
 
   dev.off()
 
   # Save as a PNG image - rainbow
   png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_rainbow.png"), width = width, height = height)
 
-  image(FFT_freq_list[[d]], col = rainbow(256), axes = FALSE, zlim = range(FFT_freq_list[[d]]))
+  image(fft_image, col = rainbow(256), axes = FALSE)
 
   dev.off()
   
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width, height = height)
 
-  image(FFT_freq_list_unconverted[[d]], col = gray.colors(256), axes = FALSE, zlim = range(FFT_freq_list_unconverted[[d]]))
+  image(fft_unconverted_image, col = gray.colors(256), axes = FALSE)
 
   dev.off()
 
   # Save as a PNG image - rainbow
   png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_rainbow.png"), width = width, height = height)
 
-  image(FFT_freq_list_unconverted[[d]], col = rainbow(256), axes = FALSE, zlim = range(FFT_freq_list_unconverted[[d]]))
+  image(fft_unconverted_image, col = rainbow(256), axes = FALSE)
 
   dev.off()
 }
