@@ -111,10 +111,10 @@ for (d in donor_IDs) {
       length(donor_IDs)
     )
   )
-
+  
   # Initialise blank matrix for signal power image
   signal_power_image <- matrix(data = 0, ncol = width, nrow = height)
-
+  
   # Loop through frames to get differences
   for (f in 2:num_frames) {
     # Get absolute difference with previous frame
@@ -126,20 +126,24 @@ for (d in donor_IDs) {
   # Scale manually to 0-255
   max_signal <- max(signal_power_image)
   signal_power_image <- round(signal_power_image / max_signal * 255)
-
+  
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_grayscale.png"), width = width, height = height)
-
+  
   image(signal_power_image, col = gray.colors(256), axes = FALSE)
-
+  
   dev.off()
-
+  
   # Save as a PNG image - rainbow
   png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_rainbow.png"), width = width, height = height)
-
+  
   image(signal_power_image, col = rainbow(256), axes = FALSE)
-
+  
   dev.off()
+  
+  # Clear free space
+  rm(signal_power_image)
+  gc()
 } # End loop through donors
 ```
 
@@ -205,6 +209,10 @@ for (d in donor_IDs) {
 
   dev.off()
 }
+
+# Clear free space
+rm(variance_list)
+gc()
 ```
 
 ## FFT dominant frequency
