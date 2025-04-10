@@ -32,7 +32,7 @@ output_dir <- "Output/"
 height <- 360
 width <- 640
 frame_rate <- 480
-num_frames <- 500
+num_frames <- 512
 
 # Vector for donor IDs - read from available .MOV files in input
 donor_IDs <- list.files(input_dir) %>%
@@ -66,7 +66,7 @@ for (d in donor_IDs) {
   video_frames <- video_frames[(length(video_frames) - (num_frames - 1)):length(video_frames)]
 
   # Initialize an empty list to store grayscale frames
-  frames_list <- vector("list", num_frames)
+  frames_array <- array(NA, dim = c(width, height, num_frames))
 
   # Extract pixel values and convert to greyscale
   for (f in 1:num_frames) {
@@ -80,13 +80,14 @@ for (d in donor_IDs) {
     frame_matrix <- as.integer(image_data(frame_gray))
 
     # Store the frame as a matrix in the list
-    frames_list[[f]] <- matrix(frame_matrix, ncol = width)
+    frames_array[,,f] <- matrix(frame_matrix, ncol = width)
   }
 
   # Save the frame list under the relevant donor
-  data_list[[d]] <- frames_list
+  data_list[[d]] <- frames_array
 
-  # Clear the cache to free space
+  # Clear free space
+  rm(frames_array)
   gc()
 }
 
@@ -97,10 +98,6 @@ save(data_list, file = paste0(output_dir, "data_list.rda"))
 ## Signal power image
 ```{r Signal power image}
 # A kind of signal power image:
-# - Subtract each frame from the previous frame. (If you do this in R, be careful with signed/unsigned issues. If you have plenty of memory, convert all images to signed integer or to floating point).
-# - Take the absolute value of those difference frames.
-# - Add all the difference frames, resulting in a 360x640 image.
-
 # Start loop through all donors
 for (d in donor_IDs) {
   # Progress monitor
@@ -116,45 +113,31 @@ for (d in donor_IDs) {
   )
 
   # Initialise blank matrix for signal power image
-  signal_power_image <- matrix(data = NA, ncol = width, nrow = height)
+  signal_power_image <- matrix(data = 0, ncol = width, nrow = height)
 
-  # Loop through pixels to get differences
-  for (x in 1:height) { # loop through rows
-    for (y in 1:width) { # Loop through columns
-
-      # Initialise sum difference values
-      sum_dif_vals <- 0
-
-      for (f in 2:num_frames) { # loop through frames, skipping the first
-        # Take absolute difference of one pixel value from the previous one
-        difference <- abs(data_list[[d]][[f]][x, y] - data_list[[d]][[(f - 1)]][x, y])
-
-        # Add to other difference values of the frame
-        sum_dif_vals <- sum_dif_vals + difference
-      }
-
-      # Add sum difference values to signal power image
-      signal_power_image[x, y] <- sum_dif_vals
-    }
+  # Loop through frames to get differences
+  for (f in 2:num_frames) {
+    # Get absolute difference with previous frame
+    difference <- abs(data_list[[d]][,,f] - data_list[[d]][,,(f-1)])
+    # Add to signal power image
+    signal_power_image <- signal_power_image + difference
   }
+  
+  # Scale manually to 0-255
+  max_signal <- max(signal_power_image)
+  signal_power_image <- round(signal_power_image / max_signal * 255)
 
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "signal_power_image_", d, "_grayscale.png"), width = width, height = height)
+  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_grayscale.png"), width = width, height = height)
 
-  # Remove margins around the image
-  par(mar = c(0, 0, 0, 0))
-
-  image(signal_power_image, col = gray.colors(256), axes = FALSE, zlim = range(signal_power_image))
+  image(signal_power_image, col = gray.colors(256), axes = FALSE)
 
   dev.off()
 
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "signal_power_image_", d, "_rainbow.png"), width = width, height = height)
+  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_rainbow.png"), width = width, height = height)
 
-  # Remove margins around the image
-  par(mar = c(0, 0, 0, 0))
-
-  image(signal_power_image, col = rainbow(256), axes = FALSE, zlim = range(signal_power_image))
+  image(signal_power_image, col = rainbow(256), axes = FALSE)
 
   dev.off()
 } # End loop through donors
@@ -184,15 +167,8 @@ for (d in donor_IDs) { # Loop through donors
 
   for (x in 1:height) { # loop through rows
     for (y in 1:width) { # Loop through columns
-      # Initialise vector of pixel values
-      pixel_values <- numeric()
-
-      for (f in 1:num_frames) { # Loop through frames
-        pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
-      }
-
       # Calculate variances and add to list in the required position
-      variance_list[[d]][x, y] <- var(pixel_values)
+      variance_list[[d]][x, y] <- var(data_list[[d]][x, y, ])
     }
   }
 }
@@ -216,20 +192,14 @@ for (d in donor_IDs) {
   )
 
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "variance_image_", d, "_grayscale.png"), width = width, height = height)
-
-  # Remove margins around the image
-  par(mar = c(0, 0, 0, 0))
+  png(paste0(output_dir, "variance_images/variance_image_", d, "_grayscale.png"), width = width, height = height)
 
   image(variance_list[[d]], col = gray.colors(256), axes = FALSE, zlim = range(variance_list[[d]]))
 
   dev.off()
 
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "variance_image_", d, "_rainbow.png"), width = width, height = height)
-
-  # Remove margins around the image
-  par(mar = c(0, 0, 0, 0))
+  png(paste0(output_dir, "variance_images/variance_image_", d, "_rainbow.png"), width = width, height = height)
 
   image(variance_list[[d]], col = rainbow(256), axes = FALSE, zlim = range(variance_list[[d]]))
 
@@ -242,12 +212,13 @@ for (d in donor_IDs) {
 # Create frequency vector
 freq <- seq(0, frame_rate / 2, length.out = num_frames / 2 + 1)
 
-# Initialise list to contain dominant frequencies
+# Initialise lists to contain dominant frequencies
 FFT_freq_list <- vector("list", length(donor_IDs))
 names(FFT_freq_list) <- donor_IDs
 for (d in donor_IDs) {
   FFT_freq_list[[d]] <- matrix(ncol = width, nrow = height)
 }
+FFT_freq_list_unconverted <- FFT_freq_list
 
 for (d in donor_IDs) { # Loop through donors
   # Progress monitor
@@ -264,12 +235,8 @@ for (d in donor_IDs) { # Loop through donors
 
   for (x in 1:height) { # loop through rows
     for (y in 1:width) { # Loop through columns
-      # Initialise vector of pixel values
-      pixel_values <- numeric()
-
-      for (f in 1:num_frames) { # Loop through frames
-        pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
-      }
+      # Get vector of pixel values
+      pixel_values <- data_list[[d]][x, y, ]
 
       # Calculate the dominant frequency from pixel values
       # Run FFT
@@ -284,12 +251,17 @@ for (d in donor_IDs) { # Loop through donors
 
       # Add to list in the required position - converted to real frequency
       FFT_freq_list[[d]][x, y] <- freq[max_index]
+      
+      # Add to list in the required position - unconverted to real frequency
+      FFT_freq_list_unconverted[[d]][x, y] <- max_index
     }
   }
 }
 
-# Save the data as a .rda file
+# Save the data as .rda files
 save(FFT_freq_list, file = paste0(output_dir, "FFT_freq_list.rda"))
+
+save(FFT_freq_list_unconverted, file = paste0(output_dir, "FFT_freq_list_unconverted.rda"))
 
 # Create dominant frequency images
 for (d in donor_IDs) {
@@ -306,107 +278,28 @@ for (d in donor_IDs) {
   )
 
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "FFT_freq_image_", d, "_grayscale.png"), width = width, height = height)
-
-  # Remove margins around the image
-  par(mar = c(0, 0, 0, 0))
+  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_grayscale.png"), width = width, height = height)
 
   image(FFT_freq_list[[d]], col = gray.colors(256), axes = FALSE, zlim = range(FFT_freq_list[[d]]))
 
   dev.off()
 
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "FFT_freq_image_", d, "_rainbow.png"), width = width, height = height)
-
-  # Remove margins around the image
-  par(mar = c(0, 0, 0, 0))
+  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_rainbow.png"), width = width, height = height)
 
   image(FFT_freq_list[[d]], col = rainbow(256), axes = FALSE, zlim = range(FFT_freq_list[[d]]))
 
   dev.off()
-}
-```
-
-## FFT dominant frequencies - unconverted
-```{r}
-# Initialise list to contain dominant frequencies (unconverted)
-FFT_freq_list_unconverted <- vector("list", length(donor_IDs))
-names(FFT_freq_list) <- donor_IDs
-for (d in donor_IDs) {
-  FFT_freq_list_unconverted[[d]] <- matrix(ncol = width, nrow = height)
-}
-
-for (d in donor_IDs) { # Loop through donors
-  # Progress monitor
-  print(
-    paste0(
-      "Calculating FFT maximum frequency (unconverted) for donor ",
-      d,
-      "; ",
-      which(donor_IDs %in% d),
-      " of ",
-      length(donor_IDs)
-    )
-  )
-
-  for (x in 1:height) { # loop through rows
-    for (y in 1:width) { # Loop through columns
-      # Initialise vector of pixel values
-      pixel_values <- numeric()
-
-      for (f in 1:num_frames) { # Loop through frames
-        pixel_values <- c(pixel_values, data_list[[d]][[f]][x, y])
-      }
-
-      # Calculate the dominant frequency from pixel values
-      # Run FFT
-      fft_result <- fft(pixel_values)
-
-      # Find maximum magnitude - using half the dataset (symetrical)
-      magnitude <- abs(fft_result[1:(num_frames / 2 + 1)])
-
-      # Find the frequency with maximum amplitude
-      # Excluding the DC component (first element)
-      max_index <- which.max(magnitude[-1]) + 1
-
-      # Add to list in the required position - unconverted to real frequency
-      FFT_freq_list_unconverted[[d]][x, y] <- max_index
-    }
-  }
-}
-
-# Save the data as a .rda file
-save(FFT_freq_list_unconverted, file = paste0(output_dir, "FFT_freq_list_unconverted.rda"))
-
-# Create dominant frequency images
-for (d in donor_IDs) {
-  # Progress monitor
-  print(
-    paste0(
-      "Creating pixel FFT unconverted frequency image for donor ",
-      d,
-      ", ",
-      which(donor_IDs %in% d),
-      " of ",
-      length(donor_IDs)
-    )
-  )
-
+  
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width, height = height)
-
-  # Remove margins around the image
-  par(mar = c(0, 0, 0, 0))
+  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width, height = height)
 
   image(FFT_freq_list_unconverted[[d]], col = gray.colors(256), axes = FALSE, zlim = range(FFT_freq_list_unconverted[[d]]))
 
   dev.off()
 
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "FFT_unconverted_freq_image_", d, "_rainbow.png"), width = width, height = height)
-
-  # Remove margins around the image
-  par(mar = c(0, 0, 0, 0))
+  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_rainbow.png"), width = width, height = height)
 
   image(FFT_freq_list_unconverted[[d]], col = rainbow(256), axes = FALSE, zlim = range(FFT_freq_list_unconverted[[d]]))
 
@@ -442,6 +335,6 @@ for (d in donor_IDs) {
     theme_bw()
 
   # Save the plot
-  ggsave(paste0(output_dir, d, " frequency index histogram.png"), width = 8, height = 5.5)
+  ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8, height = 5.5)
 }
 ```
