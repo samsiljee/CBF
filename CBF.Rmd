@@ -8,12 +8,12 @@ author: "Sam Siljee"
 date: '2022-06-17'
 output: html_document
 ---
-  
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-In this script I'm using the variable `d` to represent the donor/well, `x` for the pixel x coordinate, `y` for the pixel y coordinate, and `f` for the frame number.
+In this script I'm using the variable `d` to represent the donor/well, `x` for the pixel x coordinate, `y` for the pixel y coordinate, and `z` for the frame number.
 
 ```{r packages, include = FALSE}
 library(dplyr) # Pipe and data manipulation
@@ -28,29 +28,34 @@ library(stringr) # Strip ".MOV" from file names
 input_dir <- "Input/"
 output_dir <- "Output/"
 
+# Load data from pre-prepared data
+load_from_rda <- TRUE
+
 # Set video details
 height <- 360
 width <- 640
 frame_rate <- 480
 num_frames <- 512
 
-# Vector for donor IDs - read from available .MOV files in input
+# Minimum frequency threshold (Hz)
+frequency_threshold <- 5
+
+# Vector for donor IDs - read from available .MOV files in input folder
 donor_IDs <- list.files(input_dir) %>%
   grep(pattern = ".MOV$", value = TRUE) %>%
   str_remove(".MOV")
 ```
 
-## Extract frames
-```{r Extract frames}
-# Initialise a list to hold all pixel data
-data_list <- list()
-
-# Iterate over donors - extract relevant pixel values
+## Run cilia analysis
+Changed to run the whole analysis on a donor by donor basis to speed up processing. only saving the 3D arrays from the video input rather than saving data from every intermittent step.
+```{r}
+start_time <- Sys.time()
+# Repeat process for each donor
 for (d in donor_IDs) {
   # Print message to keep track of progress
   print(
     paste0(
-      "Extracting frames for donor ",
+      "Starting on donor ",
       d,
       ", ",
       which(donor_IDs %in% d),
@@ -58,293 +63,185 @@ for (d in donor_IDs) {
       length(donor_IDs)
     )
   )
-
-  # Load video with magick
-  video_frames <- image_read_video(paste0(input_dir, d, ".MOV"), fps = NULL)
-
-  # keep the last X frames
-  video_frames <- video_frames[(length(video_frames) - (num_frames - 1)):length(video_frames)]
-
-  # Initialize an empty list to store grayscale frames
-  frames_array <- array(NA, dim = c(height, width, num_frames))
-
-  # Extract pixel values and convert to greyscale
-  for (f in 1:num_frames) {
-    # Extract the current frame
-    frame <- video_frames[f]
-
-    # Convert the frame to grayscale
-    frame_gray <- image_convert(frame, colorspace = "gray")
-
-    # Get pixel values and scale to 0-255 range
-    frame_matrix <- as.integer(image_data(frame_gray))
-
-    # Store the frame as a matrix in the list
-    frames_array[,,f] <- matrix(frame_matrix, ncol = width)
-  }
-
-  # Save the frame list under the relevant donor
-  data_list[[d]] <- frames_array
-
-  # Clear free space
-  rm(frames_array)
-  gc()
-}
-
-# Save the data as a .rda file
-save(data_list, file = paste0(output_dir, "data_list.rda"))
-```
-
-## Signal power image
-```{r Signal power image}
-# A kind of signal power image:
-# Start loop through all donors
-for (d in donor_IDs) {
-  # Progress monitor
-  print(
-    paste0(
-      "Maing signal power images for donor ",
-      d,
-      ", ",
-      which(donor_IDs %in% d),
-      " of ",
-      length(donor_IDs)
-    )
-  )
+  
+  ## Extract frames / load data ----
+  if(load_from_rda) {
+    # Load from prepared data
+    print("Loading .rda")
+    load(paste0(output_dir, "prepared_data/", d, "_3D_array.rda"))
+  } else {
+    # Read in from video data
+    print("Extracting frames")
+    
+    # Load video with magick
+    video_frames <- image_read_video(paste0(input_dir, d, ".MOV"), fps = NULL)
+    
+    # keep the last X frames
+    video_frames <- video_frames[(length(video_frames) - (num_frames - 1)):length(video_frames)]
+    
+    # Initialize an empty 3D array
+    video_array <- array(NA, dim = c(num_frames, height, width))
+    
+    # Extract pixel values and convert to greyscale
+    for (z in 1:num_frames) {
+      # Extract the current frame - no need to convert if already grayscale
+      frame <- video_frames[z]
+      
+      # Get pixel values as numeric intensity
+      frame_matrix <- as.numeric(image_data(frame))[,,1]
+      
+      # Store the frame in the array
+      video_array[z,,] <- matrix(frame_matrix, ncol = width)
+    }
+    
+    # Clear free space
+    gc()
+    
+    # Save the data as a .rda file - for faster loading in future
+    save(video_array, file = paste0(output_dir, "prepared_data/", d, "_3D_array.rda"))
+  } # Close data loading else statement
+  
+  # Video load time
+  video_load_time <- Sys.time()
+  
+  ## Signal power image ----
+  print("Making signal power images")
   
   # Initialise blank matrix for signal power image
-  signal_power_image <- matrix(data = 0, ncol = width, nrow = height)
+  signal_power_image <- matrix(data = 0, ncol = height, nrow = width)
   
   # Loop through frames to get differences
-  for (f in 2:num_frames) {
+  for (z in 2:num_frames) {
     # Get absolute difference with previous frame
-    difference <- abs(data_list[[d]][,,f] - data_list[[d]][,,(f-1)])
+    difference <- abs(video_array[z,,] - video_array[(z-1),,])
+    
     # Add to signal power image
     signal_power_image <- signal_power_image + difference
   }
   
   # Scale manually to 0-255
-  max_signal <- max(signal_power_image)
-  signal_power_image <- round(signal_power_image / max_signal * 255)
+  signal_power_image <- round(signal_power_image / max(signal_power_image) * 255)
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_grayscale.png"), width = width, height = height)
-  
+  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_grayscale.png"))
   image(signal_power_image, col = gray.colors(256), axes = FALSE)
-  
   dev.off()
   
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_rainbow.png"), width = width, height = height)
-  
+  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_rainbow.png"))
   image(signal_power_image, col = rainbow(256), axes = FALSE)
-  
   dev.off()
   
   # Clear free space
-  rm(signal_power_image)
   gc()
-} # End loop through donors
-```
-
-## Variances
-```{r Variances}
-# Initialise list to contain variances
-variance_list <- vector("list", length(donor_IDs))
-names(variance_list) <- donor_IDs
-for (d in donor_IDs) {
-  variance_list[[d]] <- matrix(ncol = width, nrow = height)
-}
-
-for (d in donor_IDs) { # Loop through donors
-  # Progress monitor
-  print(
-    paste0(
-      "Calculating pixel variances for donor ",
-      d,
-      ", ",
-      which(donor_IDs %in% d),
-      " of ",
-      length(donor_IDs)
-    )
-  )
-
-  for (x in 1:height) { # loop through rows
-    for (y in 1:width) { # Loop through columns
-      # Calculate variances and add to list in the required position
-      variance_list[[d]][x, y] <- var(data_list[[d]][x, y, ])
-    }
-  }
-}
-
-
-# Save the data as a .rda file
-save(variance_list, file = paste0(output_dir, "variance_list.rda"))
-
-# Create variance images
-for (d in donor_IDs) {
-  # Progress monitor
-  print(
-    paste0(
-      "Creating pixel variance images for donor ",
-      d,
-      ", ",
-      which(donor_IDs %in% d),
-      " of ",
-      length(donor_IDs)
-    )
-  )
   
-    # Scale manually to 0-255
-  variance_max <- max(variance_list[[d]])
-  variance_image <- round(variance_list[[d]] / variance_max * 255)
-
-  # Save as a PNG image - grayscale
-  png(paste0(output_dir, "variance_images/variance_image_", d, "_grayscale.png"), width = width, height = height)
-
-  image(variance_image, col = gray.colors(256), axes = FALSE)
-
-  dev.off()
-
-  # Save as a PNG image - rainbow
-  png(paste0(output_dir, "variance_images/variance_image_", d, "_rainbow.png"), width = width, height = height)
-
-  image(variance_image, col = rainbow(256), axes = FALSE)
-
-  dev.off()
-}
-
-# Clear free space
-rm(variance_list)
-gc()
-```
-
-## FFT dominant frequency
-```{r FFT frequencies}
-# Create frequency vector
-freq <- seq(0, frame_rate / 2, length.out = num_frames / 2 + 1)
-
-# Initialise lists to contain dominant frequencies
-FFT_freq_list <- vector("list", length(donor_IDs))
-names(FFT_freq_list) <- donor_IDs
-for (d in donor_IDs) {
-  FFT_freq_list[[d]] <- matrix(ncol = width, nrow = height)
-}
-FFT_freq_list_unconverted <- FFT_freq_list
-
-for (d in donor_IDs) { # Loop through donors
-  # Progress monitor
-  print(
-    paste0(
-      "Calculating FFT maximum frequency for donor ",
-      d,
-      "; ",
-      which(donor_IDs %in% d),
-      " of ",
-      length(donor_IDs)
-    )
-  )
-
-  for (x in 1:height) { # loop through rows
-    for (y in 1:width) { # Loop through columns
-      # Get vector of pixel values
-      pixel_values <- data_list[[d]][x, y, ]
-
-      # Calculate the dominant frequency from pixel values
-      # Run FFT
-      fft_result <- fft(pixel_values)
-
-      # Find maximum magnitude - using half the dataset (symetrical)
-      magnitude <- abs(fft_result[1:(num_frames / 2 + 1)])
-
-      # Find the frequency with maximum amplitude
-      # Excluding the DC component (first element)
-      max_index <- which.max(magnitude[-1]) + 1
-
-      # Add to list in the required position - converted to real frequency
-      FFT_freq_list[[d]][x, y] <- freq[max_index]
-      
-      # Add to list in the required position - unconverted to real frequency
-      FFT_freq_list_unconverted[[d]][x, y] <- max_index
+  ## Variance image ----
+  print("Making variance images")
+  
+  # Initialise blank matrix
+  variance_matrix <- matrix(ncol = width, nrow = height)
+  
+  # Get variance by pixel
+  for (y in 1:width) { # loop through columns
+    for (x in 1:height) { # Loop through rows
+      # Calculate variances and add to list in the required position
+      variance_matrix[x, y] <- var(video_array[, y, x])
     }
   }
-}
-
-# Save the data as .rda files
-save(FFT_freq_list, file = paste0(output_dir, "FFT_freq_list.rda"))
-
-save(FFT_freq_list_unconverted, file = paste0(output_dir, "FFT_freq_list_unconverted.rda"))
-
-# Create dominant frequency images
-for (d in donor_IDs) {
-  # Progress monitor
-  print(
-    paste0(
-      "Creating pixel FFT frequency image for donor ",
-      d,
-      ", ",
-      which(donor_IDs %in% d),
-      " of ",
-      length(donor_IDs)
-    )
-  )
   
   # Scale manually to 0-255
-  fft_max <- max(FFT_freq_list[[d]])
-  fft_image <- round(FFT_freq_list[[d]] / fft_max * 255)
+  variance_image <- round(variance_matrix / max(variance_matrix) * 255)
   
-  fft_unconverted_max <- max(FFT_freq_list_unconverted[[d]])
-  fft_unconverted_image <- round(FFT_freq_list_unconverted[[d]] / fft_unconverted_max * 255)
-
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_grayscale.png"), width = width, height = height)
-
+  png(paste0(output_dir, "variance_images/variance_image_", d, "_grayscale.png"))
+  image(variance_image, col = gray.colors(256), axes = FALSE)
+  dev.off()
+  
+  # Save as a PNG image - rainbow
+  png(paste0(output_dir, "variance_images/variance_image_", d, "_rainbow.png"))
+  image(variance_image, col = rainbow(256), axes = FALSE)
+  dev.off()
+  
+  ## FFT ----
+  print("Making FFT images")
+  
+  # Create frequency vector
+  freq <- seq(0, frame_rate / 2, length.out = num_frames / 2 + 1)
+  
+  # Calculate offset to exclude results below the threshold
+  threshold_offset <- sum(freq < frequency_threshold)
+  
+  # Initialise matrixes to contain dominant frequencies
+  FFT_matrix <- matrix(ncol = width, nrow = height)
+  FFT_matrix_unconverted <- FFT_matrix
+  
+  # Calculate FFT and extract dominant frequencies
+  for (y in 1:width) { # loop through columns
+    for (x in 1:height) { # Loop through rows
+      # Get vector of pixel values
+      pixel_values <- video_array[, y, x]
+      
+      # Run FFT
+      fft_result <- fft(pixel_values)
+      
+      # Get magnitudes
+      magnitude <- abs(fft_result)
+      
+      # Find the frequency with maximum amplitude
+      # Excluding the DC component (first element)
+      max_index <- which.max(magnitude[-(1:threshold_offset)])
+      
+      # Add to list in the required position - converted to real frequency and unconverted
+      FFT_matrix[x, y] <- freq[(max_index + threshold_offset)]
+      FFT_matrix_unconverted[x, y] <- max_index + threshold_offset
+    }
+  }
+  
+  # Scale manually to 0-255
+  fft_image <- round(FFT_matrix / max(FFT_matrix) * 255)
+  fft_unconverted_image <- round(FFT_matrix_unconverted / max(FFT_matrix_unconverted) * 255)
+  
+  # Save as a PNG image - grayscale
+  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_grayscale.png"))
   image(fft_image, col = gray.colors(256), axes = FALSE)
-
   dev.off()
-
+  
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_rainbow.png"), width = width, height = height)
-
+  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_rainbow.png"))
   image(fft_image, col = rainbow(256), axes = FALSE)
-
   dev.off()
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width, height = height)
-
+  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"))
   image(fft_unconverted_image, col = gray.colors(256), axes = FALSE)
-
   dev.off()
-
+  
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_rainbow.png"), width = width, height = height)
-
+  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_rainbow.png"))
   image(fft_unconverted_image, col = rainbow(256), axes = FALSE)
-
   dev.off()
-}
-```
-
-## Histograms of indexes
-```{r histograms}
-# Create dominant index histograms
-for (d in donor_IDs) {
-  # Progress monitor
-  print(
-    paste0(
-      "Creating dominant frequency histogram for donor ",
-      d,
-      ", ",
-      which(donor_IDs %in% d),
-      " of ",
-      length(donor_IDs)
-    )
-  )
-
-  indexes <- FFT_freq_list_unconverted[[d]] %>% as.numeric()
-
-  ggplot(data.frame(Index = indexes), aes(x = Index)) +
+  
+  # Clear free space
+  gc()
+  
+  ## Histograms ----
+  print("Making histograms")
+  
+  # Histogram of converted frequencies
+  ggplot(data.frame(Frequency = as.numeric(FFT_matrix)), aes(x = Frequency)) +
+    geom_histogram(binwidth = 1) +
+    labs(
+      x = "Frequency (Hz)",
+      y = "Count",
+      title = paste("Hisotgram of dominant frequency:", d)
+    ) +
+    theme_bw()
+  
+  # Save the plot
+  ggsave(paste0(output_dir, "histograms/", d, " frequency histogram.png"), width = 8, height = 5.5)
+  
+  # Histogram of unconverted (indexes)
+  ggplot(data.frame(Index = as.numeric(FFT_matrix)), aes(x = Index)) +
     geom_histogram(binwidth = 1) +
     labs(
       x = "Dominant frequency index (binwidth = 1)",
@@ -352,8 +249,10 @@ for (d in donor_IDs) {
       title = paste("Hisotgram of dominant frequency indexes:", d)
     ) +
     theme_bw()
-
+  
   # Save the plot
   ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8, height = 5.5)
-}
+} # Close loop over donors
+
+end_time <- Sys.time()
 ```
