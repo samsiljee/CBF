@@ -29,7 +29,7 @@ input_dir <- "Input/"
 output_dir <- "Output/"
 
 # Load data from pre-prepared data
-load_from_rda <- TRUE
+load_from_rda <- FALSE
 
 # Set video details
 height <- 360
@@ -138,6 +138,11 @@ for (d in donor_IDs) {
   image(signal_power_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
+  # Save as .csv file
+  write.csv(
+    matrix(signal_power_image, nrow = height, ncol = width),
+    paste0(output_dir, "csv_results/", d, "_signal_power_image.csv"))
+  
   # Clear free space
   gc()
   
@@ -169,6 +174,11 @@ for (d in donor_IDs) {
   par(mar = c(0, 0, 0, 0))
   image(variance_image, col = rainbow(256), axes = FALSE)
   dev.off()
+  
+  # Save as .csv file
+  write.csv(
+    matrix(variance_image, nrow = height, ncol = width),
+    paste0(output_dir, "csv_results/", d, "_variance_image.csv"))
   
   ## FFT ----
   print("Making FFT images")
@@ -223,6 +233,11 @@ for (d in donor_IDs) {
   image(fft_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
+  # Save as .csv file
+  write.csv(
+    matrix(fft_image, nrow = height, ncol = width),
+    paste0(output_dir, "csv_results/", d, "_fft_image.csv"))
+  
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
   par(mar = c(0, 0, 0, 0))
@@ -234,6 +249,11 @@ for (d in donor_IDs) {
   par(mar = c(0, 0, 0, 0))
   image(fft_unconverted_image, col = rainbow(256), axes = FALSE)
   dev.off()
+  
+  # Save as .csv file
+  write.csv(
+    matrix(fft_unconverted_image, nrow = height, ncol = width),
+    paste0(output_dir, "csv_results/", d, "_fft_unconverted_image.csv"))
   
   # Clear free space
   gc()
