@@ -69,6 +69,10 @@ for (d in donor_IDs) {
     # Load from prepared data
     print("Loading .rda")
     load(paste0(output_dir, "prepared_data/", d, "_3D_array.rda"))
+    
+    # Re-organise the dimensions - remove this when working properly again!
+    video_array <- aperm(video_array, c(2, 3, 1))
+    
   } else {
     # Read in from video data
     print("Extracting frames")
@@ -91,7 +95,7 @@ for (d in donor_IDs) {
       frame_matrix <- as.numeric(image_data(frame))[,,1]
       
       # Store the frame in the array
-      video_array[z,,] <- matrix(frame_matrix, ncol = width)
+      video_array[,,z] <- matrix(frame_matrix, ncol = width, nrow = height)
     }
     
     # Clear free space
@@ -108,12 +112,12 @@ for (d in donor_IDs) {
   print("Making signal power images")
   
   # Initialise blank matrix for signal power image
-  signal_power_image <- matrix(data = 0, ncol = height, nrow = width)
+  signal_power_image <- matrix(data = 0, ncol = width, nrow = height)
   
   # Loop through frames to get differences
   for (z in 2:num_frames) {
     # Get absolute difference with previous frame
-    difference <- abs(video_array[z,,] - video_array[(z-1),,])
+    difference <- abs(video_array[,,z] - video_array[,,(z-1)])
     
     # Add to signal power image
     signal_power_image <- signal_power_image + difference
@@ -123,12 +127,14 @@ for (d in donor_IDs) {
   signal_power_image <- round(signal_power_image / max(signal_power_image) * 255)
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_grayscale.png"))
+  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
+  par(mar = c(0, 0, 0, 0))
   image(signal_power_image, col = gray.colors(256), axes = FALSE)
   dev.off()
   
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_rainbow.png"))
+  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_rainbow.png"), width = width * 10, height = height * 10)
+  par(mar = c(0, 0, 0, 0))
   image(signal_power_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
@@ -145,7 +151,7 @@ for (d in donor_IDs) {
   for (y in 1:width) { # loop through columns
     for (x in 1:height) { # Loop through rows
       # Calculate variances and add to list in the required position
-      variance_matrix[x, y] <- var(video_array[, y, x])
+      variance_matrix[x, y] <- var(video_array[x, y, ])
     }
   }
   
@@ -153,12 +159,14 @@ for (d in donor_IDs) {
   variance_image <- round(variance_matrix / max(variance_matrix) * 255)
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "variance_images/variance_image_", d, "_grayscale.png"))
+  png(paste0(output_dir, "variance_images/variance_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
+  par(mar = c(0, 0, 0, 0))
   image(variance_image, col = gray.colors(256), axes = FALSE)
   dev.off()
   
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "variance_images/variance_image_", d, "_rainbow.png"))
+  png(paste0(output_dir, "variance_images/variance_image_", d, "_rainbow.png"), width = width * 10, height = height * 10)
+  par(mar = c(0, 0, 0, 0))
   image(variance_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
@@ -179,7 +187,7 @@ for (d in donor_IDs) {
   for (y in 1:width) { # loop through columns
     for (x in 1:height) { # Loop through rows
       # Get vector of pixel values
-      pixel_values <- video_array[, y, x]
+      pixel_values <- video_array[x, y, ]
       
       # Run FFT
       fft_result <- fft(pixel_values)
@@ -187,13 +195,15 @@ for (d in donor_IDs) {
       # Get magnitudes
       magnitude <- abs(fft_result)
       
+      # Set all magnitudes below frequency threshold to -Inf so they won't be selected
+       magnitude[1:threshold_offset] <- -Inf
+      
       # Find the frequency with maximum amplitude
-      # Excluding the DC component (first element)
-      max_index <- which.max(magnitude[-(1:threshold_offset)])
+      max_index <- which.max(magnitude)
       
       # Add to list in the required position - converted to real frequency and unconverted
-      FFT_matrix[x, y] <- freq[(max_index + threshold_offset)]
-      FFT_matrix_unconverted[x, y] <- max_index + threshold_offset
+      FFT_matrix[x, y] <- freq[max_index]
+      FFT_matrix_unconverted[x, y] <- max_index
     }
   }
   
@@ -202,22 +212,26 @@ for (d in donor_IDs) {
   fft_unconverted_image <- round(FFT_matrix_unconverted / max(FFT_matrix_unconverted) * 255)
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_grayscale.png"))
+  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
+  par(mar = c(0, 0, 0, 0))
   image(fft_image, col = gray.colors(256), axes = FALSE)
   dev.off()
   
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_rainbow.png"))
+  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_rainbow.png"), width = width * 10, height = height * 10)
+  par(mar = c(0, 0, 0, 0))
   image(fft_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"))
+  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
+  par(mar = c(0, 0, 0, 0))
   image(fft_unconverted_image, col = gray.colors(256), axes = FALSE)
   dev.off()
   
   # Save as a PNG image - rainbow
-  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_rainbow.png"))
+  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_rainbow.png"), width = width * 10, height = height * 10)
+  par(mar = c(0, 0, 0, 0))
   image(fft_unconverted_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
@@ -255,4 +269,5 @@ for (d in donor_IDs) {
 } # Close loop over donors
 
 end_time <- Sys.time()
+print(end_time - start_time)
 ```
