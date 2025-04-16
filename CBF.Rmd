@@ -25,11 +25,11 @@ library(stringr) # Strip ".MOV" from file names
 
 ```{r Set some constants}
 # Directories
-input_dir <- "Input/"
-output_dir <- "Output/"
+input_dir <- "Test_input/"
+output_dir <- "Test_output/"
 
 # Load data from pre-prepared data
-load_from_rda <- FALSE
+load_from_rda <- TRUE
 
 # Set video details
 height <- 360
@@ -79,13 +79,16 @@ for (d in donor_IDs) {
     
     # Use ffmpeg to extract frames and write to .png
     cmd <- paste0(
-      "ffmpeg -i Input/",
+      "ffmpeg -i ",
+      input_dir,
       d,
       ".MOV -vf \"select=between(n\\,",
       last_frame - num_frames + 1,
       "\\,",
       last_frame,
-      ")\" -vsync 0 Output/temp_frames/frame_%d.png"
+      ")\" -vsync 0 ",
+      output_dir,
+      "temp_frames/frame_%d.png"
     )
     system(cmd)
     
@@ -95,7 +98,7 @@ for (d in donor_IDs) {
     # Read in .png frames and select one channel (gray scale)
     for (z in 1:num_frames) {
       #Read in the frame
-      video_array[,,z] <- readPNG(paste0("Output/temp_frames/frame_", z, ".png"))[,,1]
+      video_array[,,z] <- readPNG(paste0(output_dir, "temp_frames/frame_", z, ".png"))[,,1]
     }
     
     # Clear free space
@@ -142,10 +145,13 @@ for (d in donor_IDs) {
   image(signal_power_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
-  # Save as .csv file
-  write.csv(
+  # Save as .tsv file
+  write.table(
     matrix(signal_power_image, nrow = height, ncol = width),
-    paste0(output_dir, "csv_results/", d, "_signal_power_image.csv"))
+    paste0(output_dir, "tsv_results/", d, "_signal_power_image.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t")
   
   # Clear free space
   gc()
@@ -179,10 +185,13 @@ for (d in donor_IDs) {
   image(variance_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
-  # Save as .csv file
-  write.csv(
+  # Save as .tsv file
+  write.table(
     matrix(variance_image, nrow = height, ncol = width),
-    paste0(output_dir, "csv_results/", d, "_variance_image.csv"))
+    paste0(output_dir, "tsv_results/", d, "_variance_image.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t")
   
   ## FFT ----
   print("Making FFT images")
@@ -193,7 +202,7 @@ for (d in donor_IDs) {
   # Calculate offset to exclude results below the threshold
   threshold_offset <- sum(freq < frequency_threshold)
   
-  # Initialise matrixes to contain dominant frequencies
+  # Initialise matrices to contain dominant frequencies
   FFT_matrix <- matrix(ncol = width, nrow = height)
   FFT_matrix_unconverted <- FFT_matrix
   
@@ -206,11 +215,11 @@ for (d in donor_IDs) {
       # Run FFT
       fft_result <- fft(pixel_values)
       
-      # Get magnitudes
-      magnitude <- abs(fft_result)
+      # Get magnitudes - using only first half of FFT results
+      magnitude <- abs(fft_result)[1:(num_frames/2 + 1)]
       
-      # Set all magnitudes below frequency threshold to -Inf so they won't be selected
-       magnitude[1:threshold_offset] <- -Inf
+      # Set all magnitudes below frequency threshold to -1 so they won't be selected
+       magnitude[1:threshold_offset] <- -1
       
       # Find the frequency with maximum amplitude
       max_index <- which.max(magnitude)
@@ -237,10 +246,13 @@ for (d in donor_IDs) {
   image(fft_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
-  # Save as .csv file
-  write.csv(
+  # Save as .tsv file
+  write.table(
     matrix(fft_image, nrow = height, ncol = width),
-    paste0(output_dir, "csv_results/", d, "_fft_image.csv"))
+    paste0(output_dir, "tsv_results/", d, "_fft_image.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t")
   
   # Save as a PNG image - grayscale
   png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
@@ -254,10 +266,13 @@ for (d in donor_IDs) {
   image(fft_unconverted_image, col = rainbow(256), axes = FALSE)
   dev.off()
   
-  # Save as .csv file
-  write.csv(
+  # Save as .tsv file
+  write.table(
     matrix(fft_unconverted_image, nrow = height, ncol = width),
-    paste0(output_dir, "csv_results/", d, "_fft_unconverted_image.csv"))
+    paste0(output_dir, "tsv_results/", d, "_fft_unconverted_image.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t")
   
   # Clear free space
   gc()
