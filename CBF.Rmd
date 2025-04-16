@@ -19,7 +19,7 @@ In this script I'm using the variable `d` to represent the donor/well, `x` for t
 library(dplyr) # Pipe and data manipulation
 library(ggplot2) # plotting
 library(signal) # Windowing for FFT
-library(magick) # Read in video files, with `ffmpeg`
+library(png) # Read in .png files
 library(stringr) # Strip ".MOV" from file names
 ```
 
@@ -36,6 +36,7 @@ height <- 360
 width <- 640
 frame_rate <- 480
 num_frames <- 512
+last_frame <- 9000
 
 # Minimum frequency threshold (Hz)
 frequency_threshold <- 5
@@ -48,8 +49,7 @@ donor_IDs <- list.files(input_dir) %>%
 
 ## Run cilia analysis
 Changed to run the whole analysis on a donor by donor basis to speed up processing. only saving the 3D arrays from the video input rather than saving data from every intermittent step.
-```{r}
-start_time <- Sys.time()
+```{r Run cilia beat frequency analysis - whole process by donor}
 # Repeat process for each donor
 for (d in donor_IDs) {
   # Print message to keep track of progress
@@ -64,38 +64,38 @@ for (d in donor_IDs) {
     )
   )
   
+  # Time for optimisation
+  start_time <- Sys.time()
+  
   ## Extract frames / load data ----
   if(load_from_rda) {
     # Load from prepared data
     print("Loading .rda")
     load(paste0(output_dir, "prepared_data/", d, "_3D_array.rda"))
     
-    # Re-organise the dimensions - remove this when working properly again!
-    video_array <- aperm(video_array, c(2, 3, 1))
-    
   } else {
     # Read in from video data
     print("Extracting frames")
     
-    # Load video with magick
-    video_frames <- image_read_video(paste0(input_dir, d, ".MOV"), fps = NULL)
-    
-    # keep the last X frames
-    video_frames <- video_frames[(length(video_frames) - (num_frames - 1)):length(video_frames)]
+    # Use ffmpeg to extract frames and write to .png
+    cmd <- paste0(
+      "ffmpeg -i Input/",
+      d,
+      ".MOV -vf \"select=between(n\\,",
+      last_frame - num_frames + 1,
+      "\\,",
+      last_frame,
+      ")\" -vsync 0 Output/temp_frames/frame_%d.png"
+    )
+    system(cmd)
     
     # Initialize an empty 3D array
-    video_array <- array(NA, dim = c(num_frames, height, width))
+    video_array <- array(NA, dim = c(height, width, num_frames))
     
-    # Extract pixel values and convert to greyscale
+    # Read in .png frames and select one channel (gray scale)
     for (z in 1:num_frames) {
-      # Extract the current frame - no need to convert if already grayscale
-      frame <- video_frames[z]
-      
-      # Get pixel values as numeric intensity
-      frame_matrix <- as.numeric(image_data(frame))[,,1]
-      
-      # Store the frame in the array
-      video_array[,,z] <- matrix(frame_matrix, ncol = width, nrow = height)
+      #Read in the frame
+      video_array[,,z] <- readPNG(paste0("Output/temp_frames/frame_", z, ".png"))[,,1]
     }
     
     # Clear free space
@@ -106,7 +106,11 @@ for (d in donor_IDs) {
   } # Close data loading else statement
   
   # Video load time
-  video_load_time <- Sys.time()
+  video_load_time <- Sys.time() - start_time
+  print(paste(
+    "Video loading time:",
+    video_load_time
+  ))
   
   ## Signal power image ----
   print("Making signal power images")
@@ -286,8 +290,12 @@ for (d in donor_IDs) {
   
   # Save the plot
   ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8, height = 5.5)
+  
+  # Video processing time
+  video_processing_time <- Sys.time() - start_time - video_load_time
+  print(paste(
+    "Video processing time:",
+    video_processing_time
+  ))
 } # Close loop over donors
-
-end_time <- Sys.time()
-print(end_time - start_time)
 ```
