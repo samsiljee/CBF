@@ -25,11 +25,11 @@ library(stringr) # Strip ".MOV" from file names
 
 ```{r Set some constants}
 # Directories
-input_dir <- "Test_input/"
-output_dir <- "Test_output/"
+input_dir <- "Input/"
+output_dir <- "Output/"
 
 # Load data from pre-prepared data
-load_from_rda <- TRUE
+load_from_rda <- FALSE
 
 # Set video details
 height <- 360
