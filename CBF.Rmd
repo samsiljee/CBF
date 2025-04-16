@@ -144,9 +144,6 @@ for (d in donor_IDs) {
     signal_power_image <- signal_power_image + difference
   }
   
-  # Scale manually to 0-255
-  signal_power_image <- round(signal_power_image / max(signal_power_image) * 255)
-  
   # Save as a PNG image - grayscale
   writePNG(signal_power_image, paste0(output_dir, "signal_power_images/signal_power_image_", d, ".png"))
   
@@ -174,9 +171,6 @@ for (d in donor_IDs) {
       variance_matrix[x, y] <- var(video_array[x, y, ])
     }
   }
-  
-  # Scale manually to 0-255
-  variance_image <- round(variance_matrix / max(variance_matrix) * 255)
   
   # Save as a PNG image - grayscale
   writePNG(variance_image, paste0(output_dir, "variance_images/variance_image_", d, ".png"))
@@ -225,10 +219,6 @@ for (d in donor_IDs) {
       FFT_matrix_unconverted[x, y] <- max_index
     }
   }
-  
-  # Scale manually to 0-255
-  fft_image <- round(FFT_matrix / max(FFT_matrix) * 255)
-  fft_unconverted_image <- round(FFT_matrix_unconverted / max(FFT_matrix_unconverted) * 255)
   
   # Save as a PNG image - grayscale
   writePNG(fft_image, paste0(output_dir, "fft_images/FFT_freq_image_", d, ".png"))
