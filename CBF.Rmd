@@ -29,7 +29,7 @@ input_dir <- "Input/"
 output_dir <- "Output/"
 
 # Load data from pre-prepared data
-load_from_rda <- FALSE
+load_from_rda <- TRUE
 
 # Set video details
 height <- 360
