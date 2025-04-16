@@ -115,6 +115,20 @@ for (d in donor_IDs) {
     video_load_time
   ))
   
+  # Compensate for fluctuating background brightness
+  frame_means <- numeric()
+  for (z in 1:num_frames) {
+    frame_means <- c(frame_means, mean(video_array[,,z]))
+  }
+  
+  # Centre compensation around zero
+  frame_means <- frame_means - mean(frame_means)
+  
+  # Subtract compensation from video array
+  for (z in 1:num_frames) {
+    video_array[,,z] <- video_array[,,z] - frame_means[z]
+  }
+  
   ## Signal power image ----
   print("Making signal power images")
   
@@ -134,20 +148,11 @@ for (d in donor_IDs) {
   signal_power_image <- round(signal_power_image / max(signal_power_image) * 255)
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
-  par(mar = c(0, 0, 0, 0))
-  image(signal_power_image, col = gray.colors(256), axes = FALSE)
-  dev.off()
-  
-  # Save as a PNG image - rainbow
-  png(paste0(output_dir, "signal_power_images/signal_power_image_", d, "_rainbow.png"), width = width * 10, height = height * 10)
-  par(mar = c(0, 0, 0, 0))
-  image(signal_power_image, col = rainbow(256), axes = FALSE)
-  dev.off()
+  writePNG(signal_power_image, paste0(output_dir, "signal_power_images/signal_power_image_", d, ".png"))
   
   # Save as .tsv file
   write.table(
-    matrix(signal_power_image, nrow = height, ncol = width),
+    signal_power_image,
     paste0(output_dir, "tsv_results/", d, "_signal_power_image.tsv"),
     row.names = FALSE,
     col.names = FALSE,
@@ -174,20 +179,11 @@ for (d in donor_IDs) {
   variance_image <- round(variance_matrix / max(variance_matrix) * 255)
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "variance_images/variance_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
-  par(mar = c(0, 0, 0, 0))
-  image(variance_image, col = gray.colors(256), axes = FALSE)
-  dev.off()
-  
-  # Save as a PNG image - rainbow
-  png(paste0(output_dir, "variance_images/variance_image_", d, "_rainbow.png"), width = width * 10, height = height * 10)
-  par(mar = c(0, 0, 0, 0))
-  image(variance_image, col = rainbow(256), axes = FALSE)
-  dev.off()
+  writePNG(variance_image, paste0(output_dir, "variance_images/variance_image_", d, ".png"))
   
   # Save as .tsv file
   write.table(
-    matrix(variance_image, nrow = height, ncol = width),
+    variance_image,
     paste0(output_dir, "tsv_results/", d, "_variance_image.tsv"),
     row.names = FALSE,
     col.names = FALSE,
@@ -235,40 +231,22 @@ for (d in donor_IDs) {
   fft_unconverted_image <- round(FFT_matrix_unconverted / max(FFT_matrix_unconverted) * 255)
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
-  par(mar = c(0, 0, 0, 0))
-  image(fft_image, col = gray.colors(256), axes = FALSE)
-  dev.off()
-  
-  # Save as a PNG image - rainbow
-  png(paste0(output_dir, "fft_images/FFT_freq_image_", d, "_rainbow.png"), width = width * 10, height = height * 10)
-  par(mar = c(0, 0, 0, 0))
-  image(fft_image, col = rainbow(256), axes = FALSE)
-  dev.off()
+  writePNG(fft_image, paste0(output_dir, "fft_images/FFT_freq_image_", d, ".png"))
   
   # Save as .tsv file
   write.table(
-    matrix(fft_image, nrow = height, ncol = width),
+    fft_image,
     paste0(output_dir, "tsv_results/", d, "_fft_image.tsv"),
     row.names = FALSE,
     col.names = FALSE,
     sep = "\t")
   
   # Save as a PNG image - grayscale
-  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_grayscale.png"), width = width * 10, height = height * 10)
-  par(mar = c(0, 0, 0, 0))
-  image(fft_unconverted_image, col = gray.colors(256), axes = FALSE)
-  dev.off()
-  
-  # Save as a PNG image - rainbow
-  png(paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, "_rainbow.png"), width = width * 10, height = height * 10)
-  par(mar = c(0, 0, 0, 0))
-  image(fft_unconverted_image, col = rainbow(256), axes = FALSE)
-  dev.off()
+  writePNG(fft_unconverted_image, paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, ".png"))
   
   # Save as .tsv file
   write.table(
-    matrix(fft_unconverted_image, nrow = height, ncol = width),
+    fft_unconverted_image,
     paste0(output_dir, "tsv_results/", d, "_fft_unconverted_image.tsv"),
     row.names = FALSE,
     col.names = FALSE,
