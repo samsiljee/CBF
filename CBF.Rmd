@@ -21,6 +21,7 @@ library(ggplot2) # plotting
 library(signal) # Windowing for FFT
 library(png) # Read in .png files
 library(stringr) # Strip ".MOV" from file names
+library(tidyr) # FOr pivot_wider function in FFT data summary
 ```
 
 ```{r Set some constants}
@@ -40,9 +41,12 @@ last_frame <- 9000
 
 # Minimum frequency threshold (Hz)
 frequency_threshold <- 5
+lower_threshold <- 7.7
+upper_threshold <- 15.5
 
 # LUT file
 LUT_file <- "lut.txt"
+annotations_file <- "annotations.tsv"
 ```
 
 ```{r Setup}
@@ -50,6 +54,9 @@ LUT_file <- "lut.txt"
 donor_IDs <- list.files(input_dir) %>%
   grep(pattern = ".MOV$", value = TRUE) %>%
   str_remove(".MOV")
+
+# Read in annotations
+annotations <- read.delim(paste0(input_dir, annotations_file))
 
 # Read in LUT file
 Custom_LUT <- read.table(paste0(input_dir, LUT_file), sep = ",")
@@ -334,3 +341,56 @@ for (d in donor_IDs) {
   ))
 } # Close loop over donors
 ```
+
+Combining the FFT frequency list with annotations for some plotting
+```{r}
+# Reform data as a dataframe
+FFT_data <- data.frame()
+for(d in annotations$ID) {
+  FFT_data <- rbind(
+    FFT_data,
+    data.frame(
+      ID = d,
+      FFT_freq = as.numeric(FFT_freq_list[[d]])
+    )
+  )
+}
+
+# Remove frequencies outside of the expected range
+FFT_data <- dplyr::filter(FFT_data, FFT_freq > lower_threshold & FFT_freq < upper_threshold)
+
+# Combine with annotations
+FFT_data <- merge(
+  FFT_data,
+  annotations,
+  by = "ID",
+  all.x = TRUE
+)
+```
+
+## Plotting FFT frequencies
+```{r}
+# Run t-test to compare
+FFT_summary <- FFT_data %>%
+  group_by(Donor, Condition) %>%
+  summarize(freq_mean = mean(FFT_freq), .groups = "drop") %>%
+  pivot_wider(names_from = Condition, values_from = freq_mean)
+
+# Perform paired t-test
+FFT_t_test <- t.test(FFT_summary$Control, FFT_summary$`p53 KD`, paired = TRUE)
+
+# boxplot of frequencies
+FFT_data %>%
+  ggplot(aes(x = Donor, y = FFT_freq, fill = Condition)) +
+  geom_boxplot() +
+    labs(
+        title = "Pixel dominant FFT frequencies",
+        x = "Donor",
+        y = "Dominant FFT frequency (Hz)"
+    ) +
+    theme_bw()
+
+# Save the plot
+ggsave(paste0(output_dir, "plots/FFT_boxplot.png"), width = 8, height = 5.5)
+```
+
