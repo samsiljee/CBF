@@ -20,14 +20,15 @@ library(dplyr) # Pipe and data manipulation
 library(ggplot2) # plotting
 library(signal) # Windowing for FFT
 library(tiff) # Read in .tiff files
+library(png) # Write png images
 library(stringr) # Strip ".MOV" from file names
 library(tidyr) # FOr pivot_wider function in FFT data summary
 ```
 
 ```{r Set some constants}
 # Directories
-input_dir <- "Test_input/"
-output_dir <- "Test_output/"
+input_dir <- "Input/"
+output_dir <- "Output/"
 
 # Options for running the script
 load_from_rda <- FALSE
@@ -299,13 +300,6 @@ for (d in donor_IDs) {
 
   # Save the plot
   ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8, height = 5.5)
-
-  # Video processing time
-  video_processing_time <- Sys.time() - start_time - video_load_time
-  print(paste(
-    "Video processing time:",
-    video_processing_time
-  ))
 } # Close loop over donors
 
 # Save the FFT data as .rda files
