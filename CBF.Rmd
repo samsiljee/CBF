@@ -22,18 +22,21 @@ library(signal) # Windowing for FFT
 library(tiff) # Read in .tiff files
 library(png) # Write png images
 library(stringr) # Strip ".MOV" from file names
-library(tidyr) # FOr pivot_wider function in FFT data summary
+library(tidyr) # For pivot_wider function in FFT data summary
+library(EBImage) # For label function to identify clusters
 ```
 
 ```{r Set some constants}
 # Directories
-input_dir <- "Input/"
-output_dir <- "Output/"
+input_dir <- "Test_input/"
+output_dir <- "Test_output/"
 
 # Options for running the script
-load_from_rda <- FALSE
-run_signal_power <- FALSE
-run_variance <- FALSE
+load_from_rda <- TRUE
+run_signal_power <- TRUE
+run_variance <- TRUE
+run_sd <- TRUE
+write_tables <- FALSE
 
 # Set video details
 height <- 360
@@ -45,6 +48,7 @@ num_frames <- 1024
 frequency_threshold <- 5
 lower_threshold <- 7.7
 upper_threshold <- 15.5
+cluster_size_threshold <- 10
 
 # LUT file
 annotations_file <- "annotations.tsv"
@@ -85,7 +89,7 @@ for (d in donor_IDs) {
       length(donor_IDs)
     )
   )
-
+  
   ## Extract frames / load data ----
   if (load_from_rda) {
     # Load from prepared data
@@ -94,7 +98,7 @@ for (d in donor_IDs) {
   } else {
     # Read in from video data
     print("Extracting frames")
-
+    
     # Use ffmpeg to extract all frames as single-channel greyscale TIFF (lossless)
     cmd <- paste0(
       "ffmpeg -i ",
@@ -105,19 +109,19 @@ for (d in donor_IDs) {
       "temp_frames/frame_%d.tiff"
     )
     system(cmd)
-
+    
     # Initialize an empty 3D array
     video_array <- array(NA, dim = c(height, width, num_frames))
-
+    
     # Read in .png frames and select one channel (gray scale)
     for (z in 1:num_frames) {
       # Read in the frame
       video_array[, , z] <- readTIFF(paste0(output_dir, "temp_frames/frame_", z, ".tiff"), as.is = TRUE)
     }
-
+    
     # Clear free space
     gc()
-
+    
     # Remove temp frames from system
     cmd <- paste0(
       "rm ",
@@ -125,64 +129,66 @@ for (d in donor_IDs) {
       "temp_frames/frame_*.tiff"
     )
     system(cmd)
-
+    
     # Save the data as a .rda file - for faster loading in future
     save(video_array, file = paste0(output_dir, "prepared_data/", d, "_3D_array.rda"))
   } # Close data loading else statement
-
+  
   # Compensate for fluctuating background brightness
   frame_means <- numeric()
   for (z in 1:num_frames) {
     frame_means <- c(frame_means, mean(video_array[, , z]))
   }
-
+  
   # Centre compensation around zero
   frame_means <- frame_means - mean(frame_means)
-
+  
   # Subtract compensation from video array
   for (z in 1:num_frames) {
     video_array[, , z] <- video_array[, , z] - frame_means[z]
   }
-
+  
   ## Signal power image ----
   if (run_signal_power) {
     print("Making signal power images")
-
+    
     # Initialise blank matrix for signal power image
     signal_power_image <- matrix(data = 0, ncol = width, nrow = height)
-
+    
     # Loop through frames to get differences
     for (z in 2:num_frames) {
       # Get absolute difference with previous frame
       difference <- abs(video_array[, , z] - video_array[, , (z - 1)])
-
+      
       # Add to signal power image
       signal_power_image <- signal_power_image + difference
     }
-
+    
     # Save as a PNG image - grayscale
     writePNG(normalise_image(signal_power_image), paste0(output_dir, "signal_power_images/signal_power_image_", d, ".png"))
-
+    
     # Save as .tsv file
-    write.table(
-      signal_power_image,
-      paste0(output_dir, "tsv_results/", d, "_signal_power_image.tsv"),
-      row.names = FALSE,
-      col.names = FALSE,
-      sep = "\t"
-    )
-
+    if(write_tables) {
+      write.table(
+        signal_power_image,
+        paste0(output_dir, "tsv_results/", d, "_signal_power_image.tsv"),
+        row.names = FALSE,
+        col.names = FALSE,
+        sep = "\t"
+      )
+    }
+    
     # Clear free space
     gc()
   }
-
+  
   ## Variance image ----
   if (run_variance) {
     print("Making variance images")
-
+    
     # Initialise blank matrix
     variance_matrix <- matrix(ncol = width, nrow = height)
-
+    
     # Get variance by pixel
     for (y in 1:width) { # loop through columns
       for (x in 1:height) { # Loop through rows
@@ -190,51 +196,83 @@ for (d in donor_IDs) {
         variance_matrix[x, y] <- var(video_array[x, y, ])
       }
     }
-
+    
     # Save as a PNG image - grayscale
     writePNG(normalise_image(variance_matrix), paste0(output_dir, "variance_images/variance_image_", d, ".png"))
-
+    
     # Save as .tsv file
-    write.table(
-      variance_image,
-      paste0(output_dir, "tsv_results/", d, "_variance_image.tsv"),
-      row.names = FALSE,
-      col.names = FALSE,
-      sep = "\t"
-    )
+    if(write_tables) {
+      write.table(
+        variance_image,
+        paste0(output_dir, "tsv_results/", d, "_variance_image.tsv"),
+        row.names = FALSE,
+        col.names = FALSE,
+        sep = "\t"
+      ) 
+    }
   }
-
+  
+  ## SD ----
+  if (run_sd) {
+    print("Making SD images")
+    
+    # Initialise blank matrix
+    sd_matrix <- matrix(ncol = width, nrow = height)
+    
+    # Get variance by pixel
+    for (y in 1:width) { # loop through columns
+      for (x in 1:height) { # Loop through rows
+        # Calculate variances and add to list in the required position
+        sd_matrix[x, y] <- sd(video_array[x, y, ])
+      }
+    }
+    
+    # Save as a PNG image - grayscale
+    writePNG(normalise_image(sd_matrix), paste0(output_dir, "sd_images/sd_image_", d, ".png"))
+    
+    # Save as .tsv file
+    if(write_tables) {
+      write.table(
+        sd_matrix,
+        paste0(output_dir, "tsv_results/", d, "_sd_image.tsv"),
+        row.names = FALSE,
+        col.names = FALSE,
+        sep = "\t"
+      )
+    }
+  }
+  
   ## FFT ----
   print("Making FFT images")
-
+  
   # Create frequency vector
   freq <- seq(0, frame_rate / 2, length.out = num_frames / 2 + 1)
-
+  
   # Calculate offset to exclude results below the threshold
   threshold_offset <- sum(freq < frequency_threshold)
-
+  
   # Initialise matrices to contain dominant frequencies
   FFT_matrix <- matrix(ncol = width, nrow = height)
   FFT_matrix_unconverted <- FFT_matrix
-
+  
   # Calculate FFT and extract dominant frequencies
   for (y in 1:width) { # loop through columns
     for (x in 1:height) { # Loop through rows
       # Get vector of pixel values
       pixel_values <- video_array[x, y, ]
-
+      
       # Run FFT
       fft_result <- fft(pixel_values)
-
+      
       # Get magnitudes - using only first half of FFT results
       magnitude <- abs(fft_result)[1:(num_frames / 2 + 1)]
-
+      
       # Set all magnitudes below frequency threshold to -1 so they won't be selected
       magnitude[1:threshold_offset] <- -1
-
+      
       # Find the frequency with maximum amplitude
       max_index <- which.max(magnitude)
-
+      
       # Add to list in the required position - converted to real frequency and unconverted
       FFT_matrix[x, y] <- freq[max_index]
       FFT_matrix_unconverted[x, y] <- max_index
@@ -244,37 +282,41 @@ for (d in donor_IDs) {
   # Add to list of all donors
   FFT_list_unconverted[[d]] <- FFT_matrix_unconverted
   FFT_list_converted[[d]] <- FFT_matrix
-
+  
   # Save as a PNG image - grayscale
   writePNG(normalise_image(FFT_matrix), paste0(output_dir, "fft_images/FFT_freq_image_", d, ".png"))
-
+  
   # Save as .tsv file
-  write.table(
-    FFT_matrix,
-    paste0(output_dir, "tsv_results/", d, "_fft_image.tsv"),
-    row.names = FALSE,
-    col.names = FALSE,
-    sep = "\t"
-  )
-
+  if(write_tables) {
+    write.table(
+      FFT_matrix,
+      paste0(output_dir, "tsv_results/", d, "_fft_image.tsv"),
+      row.names = FALSE,
+      col.names = FALSE,
+      sep = "\t"
+    ) 
+  }
+  
   # Save as a PNG image - grayscale
   writePNG(normalise_image(FFT_matrix_unconverted), paste0(output_dir, "fft_images/FFT_unconverted_freq_image_", d, ".png"))
-
+  
   # Save as .tsv file
-  write.table(
-    FFT_matrix_unconverted,
-    paste0(output_dir, "tsv_results/", d, "_fft_unconverted_image.tsv"),
-    row.names = FALSE,
-    col.names = FALSE,
-    sep = "\t"
-  )
-
+  if(write_tables) {
+    write.table(
+      FFT_matrix_unconverted,
+      paste0(output_dir, "tsv_results/", d, "_fft_unconverted_image.tsv"),
+      row.names = FALSE,
+      col.names = FALSE,
+      sep = "\t"
+    ) 
+  }
+  
   # Clear free space
   gc()
-
+  
   ## Histograms ----
   print("Making histograms")
-
+  
   # Histogram of converted frequencies
   ggplot(data.frame(Frequency = as.numeric(FFT_matrix)), aes(x = Frequency)) +
     geom_histogram(binwidth = 1) +
@@ -284,10 +326,10 @@ for (d in donor_IDs) {
       title = paste("Hisotgram of dominant frequency:", d)
     ) +
     theme_bw()
-
+  
   # Save the plot
   ggsave(paste0(output_dir, "histograms/", d, " frequency histogram.png"), width = 8, height = 5.5)
-
+  
   # Histogram of unconverted (indexes)
   ggplot(data.frame(Index = as.numeric(FFT_matrix)), aes(x = Index)) +
     geom_histogram(binwidth = 1) +
@@ -297,9 +339,21 @@ for (d in donor_IDs) {
       title = paste("Hisotgram of dominant frequency indexes:", d)
     ) +
     theme_bw()
-
+  
   # Save the plot
   ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8, height = 5.5)
+  
+  ## Identify clusters ----
+  
+  # Use custom function to identify cluster sizes
+  cluster_size_matrix <- identify_clusters(FFT_matrix_unconverted)
+  
+  # Save as a PNG image - grayscale
+  writePNG(normalise_image(cluster_size_matrix), paste0(output_dir, "cluster_images/Cluster_size_image_", d, ".png"))
+  
+  # Create binary mask
+  cluster_mask <- cluster_size_matrix > cluster_size_threshold
+  
 } # Close loop over donors
 
 # Save the FFT data as .rda files

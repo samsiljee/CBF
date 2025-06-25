@@ -45,3 +45,37 @@ normalise_image <- function(input_matrix) {
   normalised_matrix <- (input_matrix - min(input_matrix)) / (max(input_matrix) - min(input_matrix))
   return(normalised_matrix)
 }
+
+# Function to identify clusters - translation from Lambert's CiliaClusters code
+identify_clusters <- function(input_matrix) {
+  # Get unique pixel values
+  pixel_values <- unique(as.numeric(input_matrix))
+  
+  # Initialise output
+  output_matrix <- matrix(0, nrow = nrow(input_matrix), ncol = ncol(input_matrix))
+  
+  # Loop through different pixel values
+  for(i in 1:length(pixel_values)) {
+    # Set pixel value to cluster by
+    pixel_value <- pixel_values[i]
+    
+    # Create binary mask for this pixel value
+    mask <- input_matrix == pixel_value
+    
+    # Label connected components in this mask - convert to linear numeric
+    connected_components <- bwlabel(mask) %>% as.numeric()
+    
+    # Get number of components (excluding background)
+    num_clusters <- max(connected_components)
+    
+    # Get cluster sizes and update output matrix
+    for(j in 1:num_clusters) {
+      cluster_pixels <- connected_components == j
+      cluster_size <- sum(cluster_pixels)
+      output_matrix[cluster_pixels] <- cluster_size
+    }
+  }
+  
+  # Output as a matrix
+  return(output_matrix)
+}
