@@ -28,14 +28,14 @@ library(EBImage) # For label function to identify clusters
 
 ```{r Set some constants}
 # Directories
-input_dir <- "Test_input/"
-output_dir <- "Test_output/"
+input_dir <- "Input/"
+output_dir <- "Output/"
 
 # Options for running the script
 load_from_rda <- TRUE
-run_signal_power <- TRUE
-run_variance <- TRUE
-run_sd <- TRUE
+run_signal_power <- FALSE
+run_variance <- FALSE
+run_sd <- FALSE
 write_tables <- FALSE
 
 # Set video details
@@ -348,11 +348,29 @@ for (d in donor_IDs) {
   # Use custom function to identify cluster sizes
   cluster_size_matrix <- identify_clusters(FFT_matrix_unconverted)
   
+  # Save as .tsv file
+  write.table(
+    cluster_size_matrix,
+    paste0(output_dir, "tsv_results/", d, "_cluster_size_matrix.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t"
+  )
+  
   # Save as a PNG image - grayscale
   writePNG(normalise_image(cluster_size_matrix), paste0(output_dir, "cluster_images/Cluster_size_image_", d, ".png"))
   
   # Create binary mask
   cluster_mask <- cluster_size_matrix > cluster_size_threshold
+  
+  # Save as .tsv file
+  write.table(
+    cluster_mask,
+    paste0(output_dir, "tsv_results/", d, "_cluster_mask.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t"
+  )
   
   # Save as a PNG image - grayscale
   writePNG(normalise_image(cluster_mask), paste0(output_dir, "cluster_images/Cluster_mask_", d, ".png"))
