@@ -354,6 +354,9 @@ for (d in donor_IDs) {
   # Create binary mask
   cluster_mask <- cluster_size_matrix > cluster_size_threshold
   
+  # Save as a PNG image - grayscale
+  writePNG(normalise_image(cluster_mask), paste0(output_dir, "cluster_images/Cluster_mask_", d, ".png"))
+  
 } # Close loop over donors
 
 # Save the FFT data as .rda files
