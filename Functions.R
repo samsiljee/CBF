@@ -79,3 +79,46 @@ identify_clusters <- function(input_matrix) {
   # Output as a matrix
   return(output_matrix)
 }
+
+# Function to fill holes in cluster output
+fill_clusters <- function(input_matrix) {
+  # Initialize output
+  filled_matrix <- input_matrix
+  
+  # Get unique cluster sizes
+  cluster_sizes <- unique(as.numeric(input_matrix))
+  
+  # Track which pixels we've already filled to avoid conflicts
+  filled_pixels <- matrix(FALSE, nrow = nrow(input_matrix), ncol = ncol(input_matrix))
+  
+  # Process each cluster size
+  for(i in cluster_sizes) {
+    # Create mask for all clusters of this size
+    size_mask <- input_matrix == i
+    
+    # Find connected components within this size group
+    # (there might be multiple separate clusters with the same size)
+    connected_components <- bwlabel(size_mask)
+    num_components <- max(connected_components, na.rm = TRUE)
+    
+      # Process each connected component separately
+      for(comp_id in 1:num_components) {
+        # Create mask for this specific cluster
+        cluster_mask <- (connected_components == comp_id)
+        
+        # Fill holes in this cluster
+        filled_mask <- fillHull(cluster_mask)
+        
+        # Find pixels that are newly filled (holes that got filled)
+        new_fill_pixels <- filled_mask & !cluster_mask & !filled_pixels
+        
+        # Assign the cluster size to newly filled pixels
+        filled_matrix[new_fill_pixels] <- i
+        
+        # Mark these pixels as filled
+        filled_pixels[new_fill_pixels] <- TRUE
+    }
+  }
+  
+  return(filled_matrix)
+}
