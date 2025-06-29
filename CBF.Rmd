@@ -28,8 +28,8 @@ library(EBImage) # For label function to identify clusters
 
 ```{r Set some constants}
 # Directories
-input_dir <- "Input/"
-output_dir <- "Output/"
+input_dir <- "Test_input/"
+output_dir <- "Test_output/"
 
 # Options for running the script
 load_from_rda <- TRUE
@@ -344,7 +344,7 @@ for (d in donor_IDs) {
   ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8, height = 5.5)
   
   ## Identify clusters ----
-  
+  print("Identifying clusters")
   # Use custom function to identify cluster sizes
   cluster_size_matrix <- identify_clusters(FFT_matrix_unconverted)
   
@@ -361,7 +361,22 @@ for (d in donor_IDs) {
   writePNG(normalise_image(cluster_size_matrix), paste0(output_dir, "cluster_images/Cluster_size_image_", d, ".png"))
   
   # Create binary mask
-  cluster_mask <- cluster_size_matrix > cluster_size_threshold
+  cluster_mask_unfilled <- cluster_size_matrix > cluster_size_threshold
+  
+  # Save as .tsv file
+  write.table(
+    cluster_mask_unfilled,
+    paste0(output_dir, "tsv_results/", d, "_cluster_mask_unfilled.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t"
+  )
+  
+  # Save as a PNG image - grayscale
+  writePNG(normalise_image(cluster_mask_unfilled), paste0(output_dir, "cluster_images/Cluster_mask_unfilled_", d, ".png"))
+  
+  # Fill the cluster mask
+  cluster_mask <- fill_clusters(cluster_size_matrix) > cluster_size_threshold
   
   # Save as .tsv file
   write.table(
