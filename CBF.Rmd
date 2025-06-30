@@ -203,7 +203,7 @@ for (d in donor_IDs) {
     # Save as .tsv file
     if(write_tables) {
       write.table(
-        variance_image,
+        variance_matrix,
         paste0(output_dir, "tsv_results/", d, "_variance_image.tsv"),
         row.names = FALSE,
         col.names = FALSE,
