@@ -82,9 +82,7 @@ FFT_list_converted <- list()
 
 # Repeat process for each donor
 for (d in donor_IDs) {
-  graphics.off()  # Close all graphics devices
-  
-  # Print message to keep track of progress
+# Print message to keep track of progress
   print(
     paste0(
       "Starting on donor ",
@@ -371,30 +369,20 @@ for (d in donor_IDs) {
   print("Making histograms")
   
   # Histogram of converted frequencies - filtered by cluster mask
-  p1 <- ggplot(data.frame(Frequency = as.numeric(FFT_matrix[cluster_mask])), aes(x = Frequency)) +
-    geom_histogram(binwidth = 1) +
-    labs(
-      x = "Frequency (Hz)",
-      y = "Count",
-      title = paste("Hisotgram of dominant frequency:", d)
-    ) +
-    theme_bw()
-  
-  # Save the plot
-  ggsave(paste0(output_dir, "histograms/", d, " frequency histogram.png"), plot = p1, width = 8, height = 5.5)
+  png(paste0(output_dir, "histograms/", d, " frequency histogram.png"), width = 8*100, height = 5.5*100, res = 100)
+print(ggplot(data.frame(Frequency = as.numeric(FFT_matrix[cluster_mask])), aes(x = Frequency)) +
+  geom_histogram(binwidth = 1) +
+  labs(x = "Frequency (Hz)", y = "Count", title = paste("Histogram of dominant frequency:", d)) +
+  theme_bw())
+dev.off()
   
   # Histogram of unconverted (indexes)
-  p2 <- ggplot(data.frame(Index = as.numeric(FFT_matrix_unconverted[cluster_mask])), aes(x = Index)) +
-    geom_histogram(binwidth = 1) +
-    labs(
-      x = "Dominant frequency index (binwidth = 1)",
-      y = "Count",
-      title = paste("Histogram of dominant frequency indexes:", d)
-    ) +
-    theme_bw()
-  
-  # Save the plot
-  ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), plot = p2, width = 8, height = 5.5)
+  png(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8*100, height = 5.5*100, res = 100)
+print(ggplot(data.frame(Index = as.numeric(FFT_matrix_unconverted[cluster_mask])), aes(x = Index)) +
+  geom_histogram(binwidth = 1) +
+  labs(x = "Dominant frequency index (binwidth = 1)", y = "Count", title = paste("Histogram of dominant frequency indexes:", d)) +
+  theme_bw())
+dev.off()
   
   ## Phase variance ----
   if(run_phase_variance) {
