@@ -259,6 +259,9 @@ for (d in donor_IDs) {
   FFT_matrix <- matrix(ncol = width, nrow = height)
   FFT_matrix_unconverted <- FFT_matrix
   
+  # Initialise matrix for phase image
+  phase_matrix <- FFT_matrix
+  
   # Calculate FFT and extract dominant frequencies
   for (y in 1:width) { # loop through columns
     for (x in 1:height) { # Loop through rows
@@ -280,6 +283,9 @@ for (d in donor_IDs) {
       # Add to list in the required position - converted to real frequency and unconverted
       FFT_matrix[x, y] <- freq[max_index]
       FFT_matrix_unconverted[x, y] <- max_index
+      
+      # Add to phase matrix
+      phase_matrix[x, y] <- Arg(fft_result[max_index])
     }
   }
   
