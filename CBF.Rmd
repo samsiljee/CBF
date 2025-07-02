@@ -28,8 +28,8 @@ library(EBImage) # For label function to identify clusters
 
 ```{r Set some constants}
 # Directories
-input_dir <- "Test_input/"
-output_dir <- "Test_output/"
+input_dir <- "Input/"
+output_dir <- "Output/"
 
 # Options for running the script
 load_from_rda <- TRUE
@@ -82,6 +82,8 @@ FFT_list_converted <- list()
 
 # Repeat process for each donor
 for (d in donor_IDs) {
+  graphics.off()  # Close all graphics devices
+  
   # Print message to keep track of progress
   print(
     paste0(
@@ -259,9 +261,6 @@ for (d in donor_IDs) {
   FFT_matrix <- matrix(ncol = width, nrow = height)
   FFT_matrix_unconverted <- FFT_matrix
   
-  # Initialise matrix for phase image
-  phase_matrix <- FFT_matrix
-  
   # Calculate FFT and extract dominant frequencies
   for (y in 1:width) { # loop through columns
     for (x in 1:height) { # Loop through rows
@@ -283,9 +282,6 @@ for (d in donor_IDs) {
       # Add to list in the required position - converted to real frequency and unconverted
       FFT_matrix[x, y] <- freq[max_index]
       FFT_matrix_unconverted[x, y] <- max_index
-      
-      # Add to phase matrix
-      phase_matrix[x, y] <- Arg(fft_result[max_index])
     }
   }
   
@@ -375,7 +371,7 @@ for (d in donor_IDs) {
   print("Making histograms")
   
   # Histogram of converted frequencies - filtered by cluster mask
-  ggplot(data.frame(Frequency = as.numeric(FFT_matrix[cluster_mask])), aes(x = Frequency)) +
+  p1 <- ggplot(data.frame(Frequency = as.numeric(FFT_matrix[cluster_mask])), aes(x = Frequency)) +
     geom_histogram(binwidth = 1) +
     labs(
       x = "Frequency (Hz)",
@@ -385,27 +381,27 @@ for (d in donor_IDs) {
     theme_bw()
   
   # Save the plot
-  ggsave(paste0(output_dir, "histograms/", d, " frequency histogram.png"), width = 8, height = 5.5)
+  ggsave(paste0(output_dir, "histograms/", d, " frequency histogram.png"), plot = p1, width = 8, height = 5.5)
   
   # Histogram of unconverted (indexes)
-  ggplot(data.frame(Index = as.numeric(FFT_matrix_unconverted[cluster_mask])), aes(x = Index)) +
+  p2 <- ggplot(data.frame(Index = as.numeric(FFT_matrix_unconverted[cluster_mask])), aes(x = Index)) +
     geom_histogram(binwidth = 1) +
     labs(
       x = "Dominant frequency index (binwidth = 1)",
       y = "Count",
-      title = paste("Hisotgram of dominant frequency indexes:", d)
+      title = paste("Histogram of dominant frequency indexes:", d)
     ) +
     theme_bw()
   
   # Save the plot
-  ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8, height = 5.5)
+  ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), plot = p2, width = 8, height = 5.5)
   
   ## Phase variance ----
   if(run_phase_variance) {
     
   }
   
-  # Shannon phase entropy ----
+  ## Shannon phase entropy ----
   if(run_shannon_phase_entropy) {
     
   }
