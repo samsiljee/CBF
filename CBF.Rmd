@@ -384,25 +384,8 @@ print(ggplot(data.frame(Index = as.numeric(FFT_matrix_unconverted[cluster_mask])
   theme_bw())
 dev.off()
   
-  ## Phase variance ----
-  if(run_phase_variance) {
-    
-  }
+  ## Phase metrics ----
   
-  ## Shannon phase entropy ----
-  if(run_shannon_phase_entropy) {
-    
-  }
-  
-  # MLAD, Mean Local Angular Deviation ----
-  if(run_MLAD) {
-    
-  }
-  
-  # Fraction of cluster pixels that have at least one neighbor with a phase difference of at least "some threshold" ----
-  if(run_cluster_phase) {
-    
-  }
   
 } # Close loop over donors
 
