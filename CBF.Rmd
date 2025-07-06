@@ -80,6 +80,9 @@ FFT_list_unconverted <- list()
 # Initialise list to save converted FFT data for all donors
 FFT_list_converted <- list()
 
+# Initialise list to save phase metrics
+phase_metrics <- list()
+
 # Repeat process for each donor
 for (d in donor_IDs) {
 # Print message to keep track of progress
@@ -152,7 +155,7 @@ for (d in donor_IDs) {
     video_array[, , z] <- video_array[, , z] - frame_means[z]
   }
   
-  ## Signal power image ----
+  ## Signal power ----
   if (run_signal_power) {
     print("Making signal power images")
     
@@ -186,7 +189,7 @@ for (d in donor_IDs) {
     gc()
   }
   
-  ## Variance image ----
+  ## Variance ----
   if (run_variance) {
     print("Making variance images")
     
@@ -258,6 +261,7 @@ for (d in donor_IDs) {
   # Initialise matrices to contain dominant frequencies
   FFT_matrix <- matrix(ncol = width, nrow = height)
   FFT_matrix_unconverted <- FFT_matrix
+  phase_matrix <- FFT_matrix
   
   # Calculate FFT and extract dominant frequencies
   for (y in 1:width) { # loop through columns
@@ -280,6 +284,9 @@ for (d in donor_IDs) {
       # Add to list in the required position - converted to real frequency and unconverted
       FFT_matrix[x, y] <- freq[max_index]
       FFT_matrix_unconverted[x, y] <- max_index
+      
+      # Add to phase matrix
+      phase_matrix[x, y] <- Arg(fft_result[max_index])
     }
   }
   
@@ -289,6 +296,7 @@ for (d in donor_IDs) {
   
   # Save as a PNG image - grayscale
   writePNG(normalise_image(FFT_matrix), paste0(output_dir, "fft_images/FFT_freq_image_", d, ".png"))
+  writePNG(normalise_image(phase_matrix), paste0(output_dir, "fft_images/FFT_phase_image_", d, ".png"))
   
   # Save as .tsv file
   if(write_tables) {
@@ -298,7 +306,14 @@ for (d in donor_IDs) {
       row.names = FALSE,
       col.names = FALSE,
       sep = "\t"
-    ) 
+    )
+    write.table(
+      phase_matrix,
+      paste0(output_dir, "tsv_results/", d, "_fft_phase_image.tsv"),
+      row.names = FALSE,
+      col.names = FALSE,
+      sep = "\t"
+    )
   }
   
   # Save as a PNG image - grayscale
@@ -323,33 +338,10 @@ for (d in donor_IDs) {
   # Use custom function to identify cluster sizes
   cluster_size_matrix <- identify_clusters(FFT_matrix_unconverted)
   
-  # Save as .tsv file
-  write.table(
-    cluster_size_matrix,
-    paste0(output_dir, "tsv_results/", d, "_cluster_size_matrix.tsv"),
-    row.names = FALSE,
-    col.names = FALSE,
-    sep = "\t"
-  )
-  
   # Save as a PNG image - grayscale
   writePNG(normalise_image(cluster_size_matrix), paste0(output_dir, "cluster_images/Cluster_size_image_", d, ".png"))
   
   # Create binary mask
-  cluster_mask_unfilled <- cluster_size_matrix > cluster_size_threshold
-  
-  # Save as .tsv file
-  write.table(
-    cluster_mask_unfilled,
-    paste0(output_dir, "tsv_results/", d, "_cluster_mask_unfilled.tsv"),
-    row.names = FALSE,
-    col.names = FALSE,
-    sep = "\t"
-  )
-  
-  # Save as a PNG image - grayscale
-  writePNG(normalise_image(cluster_mask_unfilled), paste0(output_dir, "cluster_images/Cluster_mask_unfilled_", d, ".png"))
-  
   # Fill the cluster mask
   cluster_mask <- fill_clusters(cluster_size_matrix) > cluster_size_threshold
   
@@ -385,11 +377,12 @@ print(ggplot(data.frame(Index = as.numeric(FFT_matrix_unconverted[cluster_mask])
 dev.off()
   
   ## Phase metrics ----
-  
+  phase_metrics[[d]] <- analyze_phase_cluster(phaseImage = phase_matrix, clusterMask = cluster_mask, threshold = pi/4)
   
 } # Close loop over donors
 
 # Save the FFT data as .rda files
 save(FFT_list_unconverted, file = paste0(output_dir, "FFT_list_unconverted.rda"))
 save(FFT_list_converted, file = paste0(output_dir, "FFT_list_converted.rda"))
+save(phase_metrics, file = paste0(output_dir, "phase_metrics.rda"))
 ```
