@@ -48,7 +48,7 @@ num_frames <- 1024
 frequency_threshold <- 5
 lower_threshold <- 7.7
 upper_threshold <- 15.5
-cluster_size_threshold <- 10
+cluster_size_threshold <- 3
 
 # LUT file
 annotations_file <- "annotations.tsv"
