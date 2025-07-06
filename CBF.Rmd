@@ -28,15 +28,19 @@ library(EBImage) # For label function to identify clusters
 
 ```{r Set some constants}
 # Directories
-input_dir <- "Test_input/"
-output_dir <- "Test_output/"
+input_dir <- "Input/"
+output_dir <- "Output/"
 
 # Options for running the script
 load_from_rda <- TRUE
+write_tables <- FALSE
 run_signal_power <- FALSE
 run_variance <- FALSE
 run_sd <- FALSE
-write_tables <- FALSE
+run_phase_variance <- FALSE
+run_shannon_phase_entropy <- FALSE
+run_MLAD <- FALSE
+run_cluster_phase <- FALSE
 
 # Set video details
 height <- 360
@@ -78,7 +82,7 @@ FFT_list_converted <- list()
 
 # Repeat process for each donor
 for (d in donor_IDs) {
-  # Print message to keep track of progress
+# Print message to keep track of progress
   print(
     paste0(
       "Starting on donor ",
@@ -314,35 +318,6 @@ for (d in donor_IDs) {
   # Clear free space
   gc()
   
-  ## Histograms ----
-  print("Making histograms")
-  
-  # Histogram of converted frequencies
-  ggplot(data.frame(Frequency = as.numeric(FFT_matrix)), aes(x = Frequency)) +
-    geom_histogram(binwidth = 1) +
-    labs(
-      x = "Frequency (Hz)",
-      y = "Count",
-      title = paste("Hisotgram of dominant frequency:", d)
-    ) +
-    theme_bw()
-  
-  # Save the plot
-  ggsave(paste0(output_dir, "histograms/", d, " frequency histogram.png"), width = 8, height = 5.5)
-  
-  # Histogram of unconverted (indexes)
-  ggplot(data.frame(Index = as.numeric(FFT_matrix)), aes(x = Index)) +
-    geom_histogram(binwidth = 1) +
-    labs(
-      x = "Dominant frequency index (binwidth = 1)",
-      y = "Count",
-      title = paste("Hisotgram of dominant frequency indexes:", d)
-    ) +
-    theme_bw()
-  
-  # Save the plot
-  ggsave(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8, height = 5.5)
-  
   ## Identify clusters ----
   print("Identifying clusters")
   # Use custom function to identify cluster sizes
@@ -389,6 +364,28 @@ for (d in donor_IDs) {
   
   # Save as a PNG image - grayscale
   writePNG(normalise_image(cluster_mask), paste0(output_dir, "cluster_images/Cluster_mask_", d, ".png"))
+  
+  ## Histograms ----
+  print("Making histograms")
+  
+  # Histogram of converted frequencies - filtered by cluster mask
+  png(paste0(output_dir, "histograms/", d, " frequency histogram.png"), width = 8*100, height = 5.5*100, res = 100)
+print(ggplot(data.frame(Frequency = as.numeric(FFT_matrix[cluster_mask])), aes(x = Frequency)) +
+  geom_histogram(binwidth = 1) +
+  labs(x = "Frequency (Hz)", y = "Count", title = paste("Histogram of dominant frequency:", d)) +
+  theme_bw())
+dev.off()
+  
+  # Histogram of unconverted (indexes)
+  png(paste0(output_dir, "histograms/", d, " frequency index histogram.png"), width = 8*100, height = 5.5*100, res = 100)
+print(ggplot(data.frame(Index = as.numeric(FFT_matrix_unconverted[cluster_mask])), aes(x = Index)) +
+  geom_histogram(binwidth = 1) +
+  labs(x = "Dominant frequency index (binwidth = 1)", y = "Count", title = paste("Histogram of dominant frequency indexes:", d)) +
+  theme_bw())
+dev.off()
+  
+  ## Phase metrics ----
+  
   
 } # Close loop over donors
 
