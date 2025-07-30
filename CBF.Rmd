@@ -53,6 +53,7 @@ frequency_threshold <- 5
 lower_threshold <- 7.7
 upper_threshold <- 15.5
 cluster_size_threshold <- 3
+FFT_ratio_threshold <- 0.014
 
 # LUT file
 annotations_file <- "annotations.tsv"
@@ -262,6 +263,7 @@ for (d in donor_IDs) {
   FFT_matrix <- matrix(ncol = width, nrow = height)
   FFT_matrix_unconverted <- FFT_matrix
   phase_matrix <- FFT_matrix
+  FFT_ratio_matrix <- FFT_matrix
   
   # Calculate FFT and extract dominant frequencies
   for (y in 1:width) { # loop through columns
@@ -287,6 +289,9 @@ for (d in donor_IDs) {
       
       # Add to phase matrix
       phase_matrix[x, y] <- Arg(fft_result[max_index])
+      
+      # Add to ratio matrix (for masking)
+      FFT_ratio_matrix[x, y] <- max(magnitude) / sum(magnitude)
     }
   }
   
@@ -332,6 +337,38 @@ for (d in donor_IDs) {
   
   # Clear free space
   gc()
+  
+  ## Ratio masking ----
+  print("FFT ratio images/masking")
+  # Save as a PNG image - grayscale
+  writePNG(normalise_image(FFT_ratio_matrix), paste0(output_dir, "ratio_images/FFT_ratio_image_", d, ".png"))
+  
+  # Save as .tsv file
+  if(write_tables) {
+    write.table(
+      FFT_ratio_matrix,
+      paste0(output_dir, "tsv_results/", d, "_fft_ratio_image.tsv"),
+      row.names = FALSE,
+      col.names = FALSE,
+      sep = "\t"
+    ) 
+  }
+  
+  # Binarise using the threshold as a mask
+  # Fill the cluster mask
+  ratio_mask <- FFT_ratio_matrix > FFT_ratio_threshold
+  
+  # Save as .tsv file
+  write.table(
+    ratio_mask,
+    paste0(output_dir, "tsv_results/", d, "_ratio_mask.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t"
+  )
+  
+  # Save as a PNG image - grayscale
+  writePNG(normalise_image(ratio_mask), paste0(output_dir, "ratio_images/Ratio_mask_", d, ".png"))
   
   ## Identify clusters ----
   print("Identifying clusters")
