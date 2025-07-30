@@ -48,10 +48,8 @@ width <- 640
 frame_rate <- 480
 num_frames <- 1024
 
-# Minimum frequency threshold (Hz)
+# Set some thresholds
 frequency_threshold <- 5
-lower_threshold <- 7.7
-upper_threshold <- 15.5
 cluster_size_threshold <- 3
 FFT_ratio_threshold <- 0.014
 
