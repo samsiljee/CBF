@@ -357,6 +357,34 @@ for (d in donor_IDs) {
   # Save as a PNG image - grayscale
   writePNG(normalise_image(cluster_mask), paste0(output_dir, "cluster_images/Cluster_mask_", d, ".png"))
   
+   ## Phase clusters ----
+  print("Identifying phase clusters")
+  
+  # Save phase image
+  writePNG(normalise_image(phase_matrix), paste0(output_dir, "phase_images/Phase_image_", d, ".png"))
+  
+  # Use custom function to identify cluster sizes
+  phase_cluster_size_matrix <- identify_clusters(phase_matrix)
+  
+  # Save as a PNG image - grayscale
+  writePNG(normalise_image(phase_cluster_size_matrix), paste0(output_dir, "phase_images/Phase_cluster_size_image_", d, ".png"))
+  
+  # Create binary mask
+  # Fill the cluster mask
+  phase_cluster_mask <- fill_clusters(phase_cluster_size_matrix) > cluster_size_threshold
+  
+  # Save as .tsv file
+  write.table(
+    cluster_mask,
+    paste0(output_dir, "tsv_results/", d, "_phase_cluster_mask.tsv"),
+    row.names = FALSE,
+    col.names = FALSE,
+    sep = "\t"
+  )
+  
+  # Save as a PNG image - grayscale
+  writePNG(normalise_image(phase_cluster_mask), paste0(output_dir, "phase_images/Phase_cluster_mask_", d, ".png"))
+  
   ## Histograms ----
   print("Making histograms")
   
