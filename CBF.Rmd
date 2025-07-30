@@ -421,3 +421,93 @@ save(FFT_list_unconverted, file = paste0(output_dir, "FFT_list_unconverted.rda")
 save(FFT_list_converted, file = paste0(output_dir, "FFT_list_converted.rda"))
 save(phase_metrics, file = paste0(output_dir, "phase_metrics.rda"))
 ```
+
+## Check bitdepth of signal
+Code to check bit depth of signal
+```{r Signal bitdepth}
+# Initialise vector of mean dit depth values
+bit_depth <- numeric()
+
+image_mean_bit_depth <- numeric()
+
+# Repeat process for each donor
+for (d in donor_IDs) {
+# Print message to keep track of progress
+  print(
+    paste0(
+      "Starting on donor ",
+      d,
+      "; ",
+      which(donor_IDs %in% d),
+      " of ",
+      length(donor_IDs)
+    )
+  )
+  
+  ## Extract frames / load data ----
+  if (load_from_rda) {
+    # Load from prepared data
+    print("Loading .rda")
+    load(paste0(output_dir, "prepared_data/", d, "_3D_array.rda"))
+  } else {
+    # Read in from video data
+    print("Extracting frames")
+    
+    # Use ffmpeg to extract all frames as single-channel greyscale TIFF (lossless)
+    cmd <- paste0(
+      "ffmpeg -i ",
+      input_dir,
+      d,
+      ".MOV -pix_fmt gray -compression_algo lzw -vsync 0 ",
+      output_dir,
+      "temp_frames/frame_%d.tiff"
+    )
+    system(cmd)
+    
+    # Initialize an empty 3D array
+    video_array <- array(NA, dim = c(height, width, num_frames))
+    
+    # Read in .png frames and select one channel (gray scale)
+    for (z in 1:num_frames) {
+      # Read in the frame
+      video_array[, , z] <- readTIFF(paste0(output_dir, "temp_frames/frame_", z, ".tiff"), as.is = TRUE)
+    }
+    
+    # Clear free space
+    gc()
+    
+    # Remove temp frames from system
+    cmd <- paste0(
+      "rm ",
+      output_dir,
+      "temp_frames/frame_*.tiff"
+    )
+    system(cmd)
+    
+    # Save the data as a .rda file - for faster loading in future
+    save(video_array, file = paste0(output_dir, "prepared_data/", d, "_3D_array.rda"))
+  } # Close data loading else statement
+  
+  # Initialise bitdepth vetor for this image
+  image_bit_depth <- numeric()
+  
+  ## Bit depth ----
+    for(x in 1:height) {
+      for(y in 1:width) {
+        image_bit_depth <- c(
+          image_bit_depth,
+          length(unique(video_array[x,y,]))
+        )
+      }
+    }
+  
+  # Add mean image bit depth
+  image_mean_bit_depth <- c(image_mean_bit_depth, mean(image_bit_depth))
+  bit_depth <- c(bit_depth, image_bit_depth)
+   
+} # Close loop over donors
+
+summary(image_mean_bit_depth)
+summary(bit_depth)
+```
+
