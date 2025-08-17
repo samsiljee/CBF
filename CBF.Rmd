@@ -52,6 +52,7 @@ num_frames <- 1024
 frequency_threshold <- 5
 cluster_size_threshold <- 3
 FFT_ratio_threshold <- 0.014
+phase_bins <- 10
 
 # LUT file
 annotations_file <- "annotations.tsv"
@@ -401,7 +402,7 @@ for (d in donor_IDs) {
   # Use custom function to identify cluster sizes
   phase_cluster_size_matrix <- identify_clusters(
     array(
-      as.numeric(cut(phase_matrix, breaks = seq(-pi, pi, length.out = 10))),
+      as.numeric(cut(phase_matrix, breaks = seq(-pi, pi, length.out = phase_bins))),
       dim = dim(phase_matrix)
     )
   )
