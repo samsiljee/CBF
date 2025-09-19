@@ -238,3 +238,17 @@ analyze_phase_cluster <- function(phaseImage, clusterMask, threshold) {
   
   return(metrics)
 }
+
+# Small function to format t-test results for thesis
+interpret_t_test <- function(test, data, metric, conditions = c("p53 KD", "Control")) {
+  interpretation <- paste0(
+    "(p-value ",
+    round(test$p.value, digits = 3),
+    ", paired t-test, p53 KD mean ",
+    round(mean(data[[metric]][data$Condition == conditions[1]]), digits = 3),
+    ", control mean ",
+    round(mean(data[[metric]][data$Condition == conditions[2]]), digits = 3),
+    ")"
+  )
+  return(interpretation)
+}

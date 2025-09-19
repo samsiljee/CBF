@@ -541,4 +541,25 @@ for (d in donor_IDs) {
 
 summary(image_mean_bit_depth)
 summary(bit_depth)
+
+# Add in metadata and summarise
+bit_depth_summary <- merge(
+  data.frame(
+    ID = donor_IDs,
+    bit_depth = image_mean_bit_depth
+  ),
+  annotations,
+  by = "ID"
+) %>%
+  group_by(Donor, Condition) %>%
+  summarize(bit_depth_mean = mean(bit_depth), .groups = "drop")
+
+# Perform paired t-test
+bit_depth_test <- t.test(
+   dplyr::filter(bit_depth_summary, Condition == "p53 KD")$bit_depth_mean,
+   dplyr::filter(bit_depth_summary, Condition == "Control")$bit_depth_mean
+   , paired = TRUE)
+
+# Display results
+interpret_t_test(bit_depth_test, bit_depth_summary, "bit_depth_mean")
 ```
